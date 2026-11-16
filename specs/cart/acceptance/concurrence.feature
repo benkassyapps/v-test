@@ -56,6 +56,29 @@ Fonctionnalité: Modifications simultanées du panier sur plusieurs instances
       | produit | quantité |
       | A       | 20       |
 
+  @CART-R1 @CART-R15 @PLT-1
+  Scénario: Deux onglets ajoutent simultanément des produits différents alors qu'aucun panier n'existe
+    Étant donné que "alice" n'a pas de panier
+    Quand "alice" envoie simultanément l'ajout de 1 "A" via l'instance 1 et l'ajout de 2 "B" via l'instance 2
+    Alors les 2 demandes réussissent
+    Et "alice" possède exactement un panier
+    Et le panier est en version 2 avec les quantités suivantes :
+      | produit | quantité |
+      | A       | 1        |
+      | B       | 2        |
+
+  @CART-R1 @CART-R15
+  Scénario: Le deuxième onglet ajoute un produit au panier créé par le premier
+    Étant donné que "alice" n'a pas de panier
+    Et que "alice" a ajouté 1 "A" à son panier via l'instance 1
+    Quand "alice" ajoute 2 "B" à son panier via l'instance 2
+    Alors la réponse a le statut 200
+    Et "alice" possède exactement un panier
+    Et le panier est en version 2 avec les quantités suivantes :
+      | produit | quantité |
+      | A       | 1        |
+      | B       | 2        |
+
   @CART-R5 @CART-R4 @PLT-1
   Scénario: Des ajouts simultanés qui dépasseraient 999 ne sont acceptés que dans la limite
     Étant donné que "alice" possède un panier contenant :

@@ -30,12 +30,12 @@
 | CART-R3 Produit existant et actif | ajout.feature (inexistant, retiré) | Unitaires : agrégat `Cart` | ⏳ |
 | CART-R4 Quantité 1–999 | ajout.feature, modification-suppression.feature, concurrence.feature | Unitaires : agrégat ; Intégration : contrainte CHECK | ⏳ |
 | CART-R5 Une ligne par produit, cumul | ajout.feature, concurrence.feature | Unitaires : agrégat ; Intégration : index unique (CartId, ProductId), stress répété | ⏳ |
-| CART-R6 Nom et prix conservés | ajout.feature, modification-suppression.feature, creation-consultation.feature | Unitaires : agrégat | ⏳ |
+| CART-R6 Nom et prix conservés | ajout.feature, modification-suppression.feature, creation-consultation.feature, **panier-et-synchronisation.feature (bout en bout avec une vraie synchro)** | Unitaires : agrégat | ⏳ |
 | CART-R7 Version globale | ajout.feature, modification-suppression.feature, concurrence.feature | Unitaires : agrégat | ⏳ |
 | CART-R8 Version de ligne et conflit | modification-suppression.feature, concurrence.feature | Unitaires : agrégat | ⏳ |
 | CART-R9 Lignes différentes sans conflit | concurrence.feature (exemple d'Alice ×2) | Intégration : stress répété | ⏳ |
 | CART-R10 Pas de réapparition | modification-suppression.feature, concurrence.feature | Unitaires : agrégat | ⏳ |
-| CART-R11 Produit retiré dans un panier | modification-suppression.feature, ajout.feature | Unitaires : agrégat | ⏳ |
+| CART-R11 Produit retiré dans un panier | modification-suppression.feature, ajout.feature, panier-et-synchronisation.feature | Unitaires : agrégat | ⏳ |
 | CART-R12 Cohérence en cas d'échec | modification-suppression.feature (panne de base ×3) | — | ⏳ |
 | CART-R13 Créer / récupérer | creation-consultation.feature | — | ⏳ |
 | CART-R14 Consulter | creation-consultation.feature | Unitaires : calcul des montants | ⏳ |
