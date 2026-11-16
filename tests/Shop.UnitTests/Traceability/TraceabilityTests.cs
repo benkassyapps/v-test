@@ -37,9 +37,7 @@ public sealed partial class TraceabilityTests
             $"Exemptions qui ne correspondent à aucune exigence : {string.Join(", ", report.UnknownExemptions)}");
     }
 
-    [Fact(
-        DisplayName = "Tous les fichiers .feature des specs sont exécutés par le projet d'acceptation",
-        Skip = "Activé au bloc 6 (T6.4) : les .feature sont inclus progressivement, bloc par bloc (specs/platform/tasks.md).")]
+    [Fact(DisplayName = "Tous les fichiers .feature des specs sont exécutés par le projet d'acceptation")]
     public void Every_feature_file_is_executed()
     {
         var csprojPath = Path.Combine(RepositoryFiles.Root.FullName, "tests", "Shop.AcceptanceTests", "Shop.AcceptanceTests.csproj");

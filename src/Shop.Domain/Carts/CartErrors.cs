@@ -12,7 +12,7 @@ public static class CartErrors
             {
                 ["errors"] = new Dictionary<string, string[]>
                 {
-                    ["quantity"] = [$"La quantité doit être comprise entre {CartRules.MinQuantity} et {CartRules.MaxQuantity}."],
+                    ["quantity"] = [CartRules.QuantityRangeMessage],
                 },
             });
 
@@ -53,6 +53,8 @@ public static class CartRules
 {
     public const int MinQuantity = 1;
     public const int MaxQuantity = 999;
+
+    public const string QuantityRangeMessage = "La quantité doit être un entier compris entre 1 et 999.";
 
     public static bool IsValidQuantity(int quantity) => quantity is >= MinQuantity and <= MaxQuantity;
 }

@@ -30,7 +30,7 @@ SQL Server, **plusieurs instances en parallèle**. Le sujet est dans `EXERCICE_C
 - Versions de paquets centralisées dans `Directory.Packages.props` (ligne 10.0.x pour Microsoft, xunit.v3 3.x).
 
 ## Invariants de concurrence — à ne jamais casser
-1. Toute transaction qui modifie un panier commence par `SELECT … FROM Carts WITH (UPDLOCK, HOLDLOCK, ROWLOCK)`. Aucune écriture sur `CartLines` ne contourne ce verrou.
+1. Toute transaction qui modifie un panier existant commence par `SELECT Id FROM Carts WITH (UPDLOCK, ROWLOCK)`, PUIS charge les lignes (deux instructions). Aucune écriture sur `CartLines` ne contourne ce verrou. Création de panier optimiste (index unique + reprise), jamais de `HOLDLOCK` (verrou de plage sur le panier voisin).
 2. Un conflit ne se détecte que sur la **version de la ligne**, jamais sur la version globale du panier.
 3. Ordre des verrous : `Carts` → `Products`. La synchro ne verrouille que `Products`.
 4. Les commandes de panier **ne sont pas rejouées automatiquement** (risque de double application si l'accusé de commit est perdu).

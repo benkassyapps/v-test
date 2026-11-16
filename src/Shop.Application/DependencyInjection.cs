@@ -1,6 +1,7 @@
 using Cronos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Shop.Application.Carts;
 using Shop.Application.Catalog;
 
 namespace Shop.Application;
@@ -23,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<CatalogSyncService>();
         services.AddScoped<CatalogSyncScheduler>();
         services.AddScoped<CatalogQueries>();
+        services.AddScoped<CartService>();
 
         return services;
     }

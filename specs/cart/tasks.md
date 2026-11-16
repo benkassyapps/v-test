@@ -25,21 +25,21 @@
 ## Bloc 4 — Panier
 
 ### T4.1 — Persistance du panier
-- [ ] Configurations EF `Carts` (collation BIN2, `UX_Carts_UserId`, jeton de concurrence) et `CartLines` (CHECK 1–999, `UX_CartLines_CartId_ProductId`, FK `Restrict` vers `Products`, jeton de concurrence), migration `Carts`.
+- [x] Configurations EF `Carts` (collation BIN2, `UX_Carts_UserId`, jeton de concurrence) et `CartLines` (CHECK 1–999, `UX_CartLines_CartId_ProductId`, FK `Restrict` vers `Products`, jeton de concurrence), migration `Carts`.
 - **Exigences** : CART-R1, CART-R4, CART-R5. **Tests d'intégration** : chaque contrainte refuse l'état invalide par une écriture SQL directe (CHECK, unicités) ; `alice` et `Alice` donnent deux paniers distincts.
 
 ### T4.2 — Unité de travail transactionnelle
-- [ ] `CartStore.MutateAsync` : `UPDLOCK, HOLDLOCK, ROWLOCK` + chargement des lignes, création implicite, lecture du produit en `REPEATABLEREAD`, rollback sur erreur et sur `Unchanged`, **aucun rejeu automatique**.
-- [ ] `CartStore.GetOrCreateAsync` (filet de sécurité 2601/2627) et `CartReader.GetViewAsync` (requête unique en projection), tous deux sous la stratégie de rejeu idempotente (reportée depuis T1.5).
+- [x] `CartStore.ExecuteAsync` : verrou `UPDLOCK, ROWLOCK` PUIS chargement des lignes (deux instructions), création implicite **optimiste** (index unique + reprise de la commande sur collision ; pas de `HOLDLOCK`), lecture du produit en `REPEATABLEREAD` seulement si nécessaire, rollback sur erreur et sur `Unchanged`, **aucun rejeu sur erreur transitoire**, vue construite après le commit.
+- [x] `CartStore.GetOrCreateAsync` (collision 2601/2627 → panier existant, sans rejeu) et `CartReader.FindAsync` (panier et lignes en une instruction, rejeu idempotent `TransientRetry`) ; vue unique `CartView.From` pour la lecture et les réponses.
 - **Exigences** : CART-R1, CART-R2, CART-R7, CART-R9, CART-R10, CART-R12, CART-R15.
 
 ### T4.3 — Service et endpoints
-- [ ] `CartService` (GetOrCreate, Get, AddItem, ChangeQuantity, RemoveLine) et vue `CartView` (`productAvailable`, montants).
-- [ ] Endpoints `PUT/GET /api/cart`, `POST /api/cart/lines`, `PUT/DELETE /api/cart/lines/{lineId}`, validation DataAnnotations (messages en français), mapping des erreurs.
+- [x] `CartService` (GetOrCreate, Get, AddItem, ChangeQuantity, RemoveLine) et vue `CartView` (`productAvailable`, montants).
+- [x] Endpoints `PUT/GET /api/cart`, `POST /api/cart/lines`, `PUT/DELETE /api/cart/lines/{lineId}`, validation explicite des entrées (messages en français partagés avec le domaine, détail par champ), mapping des erreurs.
 - **Exigences** : CART-R13 à CART-R17, PLT-2, PLT-3.
 
 ### T4.4 — Stress de concurrence
-- [ ] Tests d'intégration **répétés** (ex. 50 itérations chacun, requêtes réparties sur les 2 hôtes et démarrées ensemble par une barrière) :
+- [x] Tests d'intégration **répétés** (ex. 50 itérations chacun, requêtes réparties sur les 2 hôtes et démarrées ensemble par une barrière) :
   - créations simultanées → 1 panier ;
   - premiers ajouts simultanés sans panier → 1 panier ;
   - N ajouts simultanés → somme exacte, version +N ;
@@ -47,12 +47,12 @@
   - même ligne et même version → toujours exactement 1 succès ;
   - suppression ∥ modification → jamais de réapparition ;
   - ajout ∥ synchro qui retire le produit → jamais d'ajout d'un produit déjà retiré.
-- [ ] Après chaque itération : invariant global vérifié en SQL (un panier par utilisateur, `Version` = nombre de commandes acceptées).
+- [x] Après chaque itération : invariant global vérifié en SQL (un panier par utilisateur, `Version` = nombre de commandes acceptées).
 - **Exigences** : CART-R1, CART-R3, CART-R5, CART-R9, CART-R10, PLT-1.
 
 ### T4.5 — Scénarios d'acceptation du panier et de la plateforme
-- [ ] Étapes Reqnroll et inclusion de `creation-consultation.feature`, `ajout.feature`, `modification-suppression.feature`, `concurrence.feature`, `panier-et-synchronisation.feature`, `platform/acceptance/plateforme.feature`.
-- [ ] Tests de non-régression issus de la revue du bloc 1 (`docs/ai-reviews.md`) : une réponse 503 (panne de base simulée) porte l'en-tête `X-Instance` ; une requête panier sans `X-User-Id` avec `Accept: text/plain` reçoit 401 et non 500.
+- [x] Étapes Reqnroll et inclusion de `creation-consultation.feature`, `ajout.feature`, `modification-suppression.feature`, `concurrence.feature`, `panier-et-synchronisation.feature`, `platform/acceptance/plateforme.feature`.
+- [x] Tests de non-régression issus de la revue du bloc 1 (`docs/ai-reviews.md`) : une réponse 503 (panne de base simulée) porte l'en-tête `X-Instance` ; une requête panier sans `X-User-Id` avec `Accept: text/plain` reçoit 401 et non 500.
 - **Exigences** : CART-R1 à CART-R17, PLT-1, PLT-2, PLT-3, PLT-6, PLT-7. **Fin** : tous les scénarios verts sur 2 instances.
 
 **🔍 Fin du bloc 4** : `/code-review high` (attention : verrous, ordre des verrous, rollback, création implicite) puis **`/security-review`** (identification, clé admin, isolation des paniers, validation, ProblemDetails, SQL brut paramétré) → tri des constats → validation → commit.

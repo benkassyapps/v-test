@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Shop.Application.Carts;
 using Shop.Application.Catalog;
+using Shop.Infrastructure.Carts;
 using Shop.Infrastructure.Catalog;
 using Shop.Infrastructure.Persistence;
 
@@ -43,6 +45,8 @@ public static class DependencyInjection
         services.AddHostedService<ReadCommittedSnapshotCheck>();
 
         AddCatalog(services, configuration);
+        services.AddScoped<ICartStore, CartStore>();
+        services.AddScoped<ICartReader, CartReader>();
 
         return services;
     }

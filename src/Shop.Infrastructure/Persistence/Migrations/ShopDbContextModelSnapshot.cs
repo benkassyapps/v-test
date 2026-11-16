@@ -23,6 +23,77 @@ namespace Shop.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Shop.Domain.Carts.Cart", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Carts_UserId");
+
+                    b.ToTable("Carts", "dbo");
+                });
+
+            modelBuilder.Entity("Shop.Domain.Carts.CartLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CartId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("CartId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CartLines_CartId_ProductId");
+
+                    b.ToTable("CartLines", "dbo", t =>
+                        {
+                            t.HasCheckConstraint("CK_CartLines_Quantity", "[Quantity] BETWEEN 1 AND 999");
+                        });
+                });
+
             modelBuilder.Entity("Shop.Domain.Catalog.Product", b =>
                 {
                     b.Property<int>("Id")
@@ -143,6 +214,26 @@ namespace Shop.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_SyncRuns_Status_Trigger");
 
                     b.ToTable("SyncRuns", "dbo");
+                });
+
+            modelBuilder.Entity("Shop.Domain.Carts.CartLine", b =>
+                {
+                    b.HasOne("Shop.Domain.Carts.Cart", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("CartId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Shop.Domain.Catalog.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Shop.Domain.Carts.Cart", b =>
+                {
+                    b.Navigation("Lines");
                 });
 #pragma warning restore 612, 618
         }

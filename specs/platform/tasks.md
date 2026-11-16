@@ -38,7 +38,7 @@
 - **Exigences** : constitution §1.4. **Tests** : le test lui-même, avec un cas négatif sur des fichiers d'exemple. **Fin** : vert.
 
 ### T1.4 — Hôte Api minimal
-- [x] `Program.cs` : configuration, `Instance:Id`, middleware `X-Instance`, `AddProblemDetails` + `IExceptionHandler` + `ProblemMapping` (table complète des codes), `AddValidation()`.
+- [x] `Program.cs` : configuration, `Instance:Id`, middleware `X-Instance`, `AddProblemDetails` + `IExceptionHandler` + `ProblemMapping` (table complète des codes).
 - [x] Schéma d'authentification `UserId` (`X-User-Id`, regex), extension `User.GetUserId()` (claim `sub`), filtre de clé d'administration (`FixedTimeEquals`).
 - [x] OpenAPI + Scalar (`Api:EnableDocs`), `/health`.
 - [x] `LoggerMessage` : catalogue d'`EventId` stables ([design §8](design.md#8-observabilité-plt-6)).

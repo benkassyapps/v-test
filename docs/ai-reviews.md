@@ -68,3 +68,34 @@ Revue sur le diff indexé (42 fichiers : synchronisation, fournisseur, verrou, p
 - Horloge de test `TestClock` réglable dans les deux sens (`FakeTimeProvider` interdit de revenir en arrière, ce que les scénarios du planificateur exigent).
 - Code généré par Reqnroll redirigé vers `obj/` (`ReqnrollUseIntermediateOutputPathForCodeBehind`) pour garder `specs/` propre.
 - Vérification par mutation : rendre le seuil du garde-fou non strict (`>=`) fait échouer 2 scénarios.
+
+## Bloc 4 — Panier — `/code-review high` — 2026-11-16
+
+Revue sur le diff indexé (24 fichiers : transaction du panier, lecture, service, endpoints, scénarios). 10 constats.
+
+| # | Constat | Décision | Justification / correction |
+|---|---|---|---|
+| 1 | Ordre des lignes différent entre les réponses des commandes et `GET /api/cart` (tri par GUID côté SQL, ordre d'insertion côté mémoire). | **Corrigé** | Ordre stable unique (nom conservé, puis identifiant) dans `CartView.From`. |
+| 2 | **`HOLDLOCK` sur une clé absente** pose un verrou de plage qui couvre aussi la clé SUIVANTE de l'index : la première création du panier d'Alice bloque le panier de Bob, y compris pendant l'attente d'un produit verrouillé par une synchronisation. | **Corrigé** | Création **optimiste** : insertion arbitrée par l'index unique, reprise complète de la commande après une collision (rien n'a été validé). Test déterministe : Bob n'est pas bloqué ; **avec `HOLDLOCK`, ce test échoue** (vérifié). Design §3, AGENTS.md mis à jour. |
+| 3 | `GetOrCreateAsync` rejoué par `TransientRetry` : après un commit dont l'accusé est perdu, répondrait 200 au lieu de 201. | **Corrigé** | Plus de rejeu automatique pour la création ; collision → panier existant (200). |
+| 4 | `ChangeQuantity` lit et verrouille toujours le produit, même pour une baisse ou une version périmée (attente inutile d'une synchronisation). | **Corrigé** | Lecture du produit seulement si une augmentation est possible (ligne présente, version à jour, quantité supérieure). |
+| 5 | Vue de la réponse construite avant le commit : verrous tenus plus longtemps. | **Corrigé** | Vue construite après le commit. |
+| 6 | Validation écrite à la main alors que `AddValidation()` est enregistré ; message de quantité dupliqué avec le domaine. | **Rejeté en partie** | Validation explicite conservée (messages et format `errors` maîtrisés) ; `AddValidation()` inutilisé retiré ; message unique partagé (`CartRules.QuantityRangeMessage`). |
+| 7 | Deux définitions des montants et de la disponibilité (projection SQL de la lecture, agrégat pour les commandes). | **Corrigé** | La lecture charge l'agrégat et passe par la même construction `CartView.From`. |
+| 8 | `CartCommandOutcome.Created/Change` jamais lus. | **Corrigé** | `ExecuteAsync` renvoie directement `Result<CartView>`. |
+| 9 | Tâches T4.2/T4.3 cochées avec des noms et comportements périmés. | **Corrigé** | Tâches et design alignés sur le code. |
+| 10 | `Guid.CreateVersion7()` lit l'horloge système au lieu du `TimeProvider` injecté. | **Corrigé** | `Guid.CreateVersion7(clock.GetUtcNow())`. |
+
+**Hypothèse de design vérifiée puis nuancée (hors revue)** : le design initial verrouillait le panier et chargeait ses lignes dans une même requête. J'ai supposé que, sous RCSI, une requête qui attend le verrou relirait les lignes d'avant le commit concurrent, et j'ai séparé verrou et lecture. Un test déterministe (transaction concurrente qui tient le verrou et modifie la ligne) montre que **la variante en une requête passe aussi** sur SQL Server 2022 avec le plan observé. Les deux instructions sont conservées (aucune dépendance à un comportement non documenté), mais les commentaires et le design ne présentent plus le défaut comme certain.
+
+**Vérifications par mutation** : comparer la version du panier au lieu de celle de la ligne fait échouer les 2 scénarios d'Alice ; remettre `HOLDLOCK` fait échouer le test de non-blocage du panier voisin.
+
+**Résultat après corrections** : build sans avertissement ; 170 tests unitaires (dont le contrôle d'exécution de tous les `.feature`, activé), 30 tests d'intégration et 108 scénarios d'acceptation verts.
+
+## Blocs 1 à 4 — `/security-review` — 2026-11-16
+
+Revue de sécurité de toute la branche (commits des blocs 1 à 3 et changements indexés du bloc 4) : injection SQL, isolation des paniers, identification, clé d'administration, fuite d'informations, validation, secrets, données du fournisseur.
+
+**Aucune vulnérabilité de gravité haute ou moyenne.** SQL brut toujours paramétré (`SqlQuery(FormattableString)`), paniers isolés par construction (aucun identifiant de panier dans les routes, lignes cherchées dans le panier de l'utilisateur courant), clé d'administration comparée en temps constant, erreurs génériques sans détail interne.
+
+**Limites assumées à documenter dans DECISIONS.md** : `X-User-Id` n'est pas une authentification (usurpation possible, assumée par le sujet ; remplacement par JWT sans toucher aux endpoints) ; clé d'administration statique et partagée (évolution : rôle porté par un fournisseur d'identité).

@@ -47,25 +47,25 @@ Les contraintes CHECK, UNIQUE et les jetons de concurrence **doublent** les règ
 Toutes les commandes passent par **un seul** chemin :
 
 ```csharp
-Task<Result<CartMutationOutcome>> ICartStore.MutateAsync(
-    string userId, bool createIfMissing,
-    Func<Cart, CartMutationContext, Result<CartChange>> mutation, CancellationToken ct);
+Task<Result<CartCommandOutcome>> ICartStore.ExecuteAsync(
+    string userId, bool createIfMissing, CartCommand command, CancellationToken ct);
+// CartCommand : (Cart cart, ICartProductLookup products, CancellationToken ct) → Task<Result<CartChange>>
 ```
 
 ```
 BEGIN TRANSACTION (READ COMMITTED, RCSI actif)
- 1. SELECT … FROM Carts WITH (UPDLOCK, HOLDLOCK, ROWLOCK) WHERE UserId = @userId
-      + lignes du panier (même requête EF : FromSql(...).Include(Lines))
+ 1. SELECT Id FROM Carts WITH (UPDLOCK, ROWLOCK) WHERE UserId = @userId               ← instruction 1 : le verrou
     ├─ trouvé     → verrou U sur la ligne Carts : tout autre écrivain du même panier ATTEND ici
-    ├─ absent + createIfMissing → INSERT Carts (Version 0)
-    │      HOLDLOCK pose un verrou de plage sur la clé absente de UX_Carts_UserId :
-    │      deux créations simultanées pour le même utilisateur sont sérialisées et la 2e voit le panier
+    │      puis chargement du panier et de ses lignes                                   ← instruction 2, APRÈS le verrou
+    ├─ absent + createIfMissing → création OPTIMISTE : INSERT Carts (Version 0) au SaveChanges
+    │      si une création concurrente l'emporte, UX_Carts_UserId refuse l'INSERT (2601) : ROLLBACK, puis la
+    │      commande est REPRISE entièrement (rien n'a été validé) ; la reprise trouve et verrouille le panier
     └─ absent sinon → cart_not_found (ROLLBACK)
  2. (ajout) SELECT Id, Name, Price, Status FROM Products WITH (REPEATABLEREAD) WHERE Id = @productId
       → verrou S conservé jusqu'au commit : une synchro ne peut pas retirer ce produit entre la vérification et le commit
  3. mutation(cart, ctx)   ← règles du domaine (§2)
     ├─ erreur      → ROLLBACK : rien n'est modifié, pas même la création implicite (CART-R7.3, CART-R15.3)
-    ├─ Unchanged   → ROLLBACK (rien à écrire), réponse 200 avec l'état actuel
+    ├─ Unchanged   → rien à écrire (aucune version ne change) ; ROLLBACK, réponse 200 avec l'état actuel
     └─ Changed     → SaveChanges : UPDATE Carts … WHERE Id = @id AND Version = @old (jeton de concurrence)
                                    + INSERT/UPDATE/DELETE CartLines … AND Version = @old
  4. COMMIT
@@ -73,17 +73,20 @@ BEGIN TRANSACTION (READ COMMITTED, RCSI actif)
 
 **Pourquoi c'est correct**
 - **Invariant** (constitution §3.1) : *toute* écriture d'un panier commence par l'étape 1. Une fois le verrou U obtenu, aucune autre transaction ne peut modifier ce panier, et la lecture des lignes (version validée la plus récente, RCSI) est donc l'état réel. Les décisions du domaine portent sur un état stable.
+- **Verrou et lecture en deux instructions** : sous RCSI, une lecture non verrouillante voit l'instantané de son instruction. Si le verrou et la lecture des lignes partageaient la même requête, la fraîcheur des lignes lues après l'attente du verrou dépendrait de l'ordre d'accès choisi par le plan, ce que la documentation ne garantit pas. Lues dans une seconde instruction, une fois le verrou obtenu, elles reflètent toujours l'état validé le plus récent. Un test déterministe le vérifie : une transaction concurrente tient le verrou et modifie la ligne, la commande attend puis renvoie 409. *Corrigé à l'implémentation : le design initial prévoyait une seule requête. Constat honnête : avec le plan observé sur SQL Server 2022, la variante en une requête passait aussi ce test ; les deux instructions sont gardées car elles ne dépendent d'aucun comportement non documenté.*
 - **Ordre des verrous unique** (`Carts` → `Products`), et la synchro ne verrouille que `Products` : il n'y a **pas de cycle, donc pas d'interblocage** entre commandes de panier, ni entre panier et synchro.
 - La transaction est **courte** : aucune entrée/sortie externe, quelques requêtes indexées. Le temps d'attente d'un second écrivain est de l'ordre de la milliseconde.
-- **Nouvelles tentatives** : les commandes de panier ne sont **pas** rejouées automatiquement (`NonRetryingExecutionStrategy` pour cette unité de travail). Si le commit réussit mais que son accusé de réception est perdu (coupure réseau), un rejeu ajouterait **deux fois** la quantité. Une erreur transitoire renvoie donc `503`, et le client décide. Les clés d'idempotence (`Idempotency-Key`) sont l'évolution qui permettrait un rejeu sûr.
+- **Nouvelles tentatives** : les commandes de panier ne sont **pas** rejouées automatiquement (aucune boucle `TransientRetry` autour de cette unité de travail). Si le commit réussit mais que son accusé de réception est perdu (coupure réseau), un rejeu ajouterait **deux fois** la quantité. Une erreur transitoire renvoie donc `503`, et le client décide. Les clés d'idempotence (`Idempotency-Key`) sont l'évolution qui permettrait un rejeu sûr.
 
-**Création explicite (`PUT /api/cart`)** : même étape 1 avec `createIfMissing`, sans mutation, puis COMMIT. La réponse est `201` si l'INSERT a eu lieu, sinon `200`. Filet de sécurité : une violation de `UX_Carts_UserId` (2601/2627), théoriquement impossible avec HOLDLOCK, est interceptée et l'opération relit le panier existant (`200`).
+- **Création optimiste plutôt que `HOLDLOCK`** : `HOLDLOCK` sur une clé absente pose un verrou de plage qui couvre aussi la clé **suivante** de l'index, c'est-à-dire le panier d'un autre utilisateur, pendant toute la transaction (y compris l'attente d'un produit verrouillé par une synchronisation). La création optimiste n'utilise aucun verrou de plage : la base arbitre les créations simultanées (index unique) et la perdante reprend sa commande. Test déterministe : le premier ajout d'Alice, bloqué par un produit verrouillé, n'empêche pas Bob (clé voisine) de modifier son panier ; avec `HOLDLOCK`, ce test échoue. *Corrigé après la revue du bloc 4 (le design initial utilisait `HOLDLOCK`).*
+
+**Création explicite (`PUT /api/cart`)** : même étape 1 avec `createIfMissing`, sans commande, puis COMMIT. La réponse est `201` si l'INSERT a eu lieu, sinon `200`. Une violation de `UX_Carts_UserId` (création concurrente) signifie que le panier existe : il est relu et renvoyé (`200`). Pas de rejeu automatique sur erreur transitoire : après un commit dont l'accusé est perdu, il répondrait `200` pour un panier que l'appel a créé.
 
 ## 4. Lecture (`GET /api/cart`)
 
-`ICartReader.GetViewAsync(userId)` : une **seule requête** SQL en projection (`AsNoTracking`), avec jointure `CartLines → Products` pour `productAvailable`. Sous RCSI, une instruction unique lit un instantané cohérent : la version du panier et ses lignes correspondent toujours au même commit. Elle n'est pas bloquée par un écrivain en cours.
+`ICartReader.FindAsync(userId)` : le panier et ses lignes en **une instruction** (`AsNoTracking`, `Include`). Sous RCSI, une instruction unique lit un instantané cohérent : la version du panier et ses lignes correspondent toujours au même commit. Elle n'est pas bloquée par un écrivain en cours. La disponibilité des produits est lue ensuite (information indicative).
 
-Les réponses des commandes sont construites **après le commit** à partir de l'agrégat en mémoire (état exact validé) et de la disponibilité des produits concernés.
+Les réponses des commandes sont construites **après le commit**, à partir de l'agrégat en mémoire (état exact validé). La lecture et les réponses partagent **la même construction** (`CartView.From`) : une seule définition des montants et de la disponibilité, et des lignes toujours dans le même ordre (nom conservé, puis identifiant).
 
 ## 5. Contrat HTTP
 
@@ -113,7 +116,7 @@ Conflit `409` :
   "status": 409, "detail": "La ligne a été modifiée depuis votre dernière lecture (version actuelle : 2).",
   "code": "cart_line_version_conflict", "currentVersion": 2, "lineId": "0193…" }
 ```
-Validation : `quantity` est `[Required, Range(1, 999)]` et `expectedVersion` est `[Required]`, avec des messages en français. Le domaine revérifie les bornes, car il ne fait pas confiance à l'appelant.
+Validation explicite dans les endpoints (`quantity` obligatoire entre 1 et 999, `expectedVersion` obligatoire, `productId` obligatoire), avec le même message que le domaine (`CartRules.QuantityRangeMessage`) et un détail par champ (`errors`). Le domaine revérifie les bornes, car il ne fait pas confiance à l'appelant.
 
 ## 6. Démonstration des scénarios de concurrence
 
@@ -123,13 +126,13 @@ Validation : `quantity` est `[Required, Range(1, 999)]` et `expectedVersion` est
 | **Alice, même ligne A, même version** | T1 commit (A v2). T2 relit A en v2 ≠ version attendue 1. | **1 succès + 409** (CART-R9.2) |
 | **10 ajouts simultanés de A** | Sérialisés par le verrou ; chacun relit la quantité validée et ajoute 2. | Quantité 20, version +10 (CART-R5.3) |
 | **Ajouts au-delà de 999** (995 + 5×2) | Sérialisés : 997 ✓, 999 ✓, puis 3 refus `quantity_limit_exceeded` (rollback). | 999, version +2 (CART-R4.3) |
-| **Premiers ajouts sans panier** (même produit ou produits différents, deux onglets) | Les deux cherchent le panier avec `UPDLOCK, HOLDLOCK` ; il est absent, donc verrou sur la clé `UserId`. Le 1er obtient le verrou, crée le panier, ajoute A et valide. Le 2e attendait **avant** de décider de créer ; il relit, **trouve** le panier et y ajoute B. | Un seul panier, 2 lignes, version 2 (CART-R1.3) |
+| **Premiers ajouts sans panier** (même produit ou produits différents, deux onglets) | Les deux constatent l'absence du panier et tentent de le créer (création optimiste). L'index unique n'accepte qu'un INSERT : le premier valide son panier avec A. Le second échoue (2601), annule, **reprend sa commande**, trouve et verrouille le panier, puis y ajoute B. | Un seul panier, 2 lignes, version 2 (CART-R1.3) |
 | **Suppression ∥ modification de A** | Celui qui obtient le verrou en premier gagne. Si c'est la suppression, la modification ne trouve plus la ligne (404). Si c'est la modification, A passe en v2 et la suppression en v1 reçoit un 409. | 1 succès ; la ligne ne réapparaît jamais (CART-R10) |
 | **Ajout ∥ synchro qui retire le produit** | L'ajout tient un verrou S sur le produit jusqu'au commit ; la synchro attend (ou l'ajout attend la synchro, puis voit le produit retiré). | Jamais d'ajout d'un produit déjà retiré (CART-R3) |
 
 ## 7. Limites assumées et évolutions
 - **Écritures sérialisées par panier** : c'est voulu, avec une contention négligeable pour un panier personnel. Les paniers différents ne se bloquent pas. Les lectures ne sont jamais bloquées.
-- **HOLDLOCK sur une clé absente** : le verrou de plage peut brièvement sérialiser la **première** création de paniers d'utilisateurs voisins dans l'index (aucun impact ensuite).
+- **Reprise après collision de création** : lors de premiers ajouts simultanés, la commande perdante est exécutée deux fois (la première annulée). C'est sûr, puisque rien n'a été validé, et rare (seulement la toute première écriture d'un utilisateur).
 - **Commandes non rejouées automatiquement** : une erreur transitoire renvoie `503`. Les clés d'idempotence (`Idempotency-Key` sur `POST /api/cart/lines`) permettraient un rejeu sûr.
 - **Prix sans devise** et sans remise ; le total est recalculé à chaque lecture (pas de colonne dénormalisée).
 - Paniers abandonnés jamais purgés : une purge par ancienneté (`UpdatedAt`) est une évolution.

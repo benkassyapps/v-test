@@ -55,7 +55,7 @@ Shop.slnx
 3. `UseExceptionHandler` + `IExceptionHandler` maison (section 5) et `UseStatusCodePages` : toute erreur sort en ProblemDetails.
 4. Authentification : schéma `UserId` (en-tête `X-User-Id`) ; endpoints admin protégés par un filtre de clé d'administration.
 5. Endpoints par fonctionnalité : `MapProductEndpoints()`, `MapCartEndpoints()`, `MapAdminCatalogEndpoints()`, `/health`, `/openapi/v1.json`, `/scalar` (si `Api:EnableDocs`).
-6. Validation des entrées : validation intégrée des minimal APIs .NET 10 (`AddValidation()`, DataAnnotations avec messages en français).
+6. Validation des entrées : explicite dans les endpoints (messages en français partagés avec le domaine, détail par champ dans `errors`, code `validation_failed`) ; les erreurs de liaison (JSON mal formé, type invalide) sont converties en 400 par le gestionnaire d'erreurs. *La validation intégrée de .NET 10 (`AddValidation()`) a été écartée à l'implémentation : messages et format moins maîtrisés.*
 
 ## 4. Identification de l'utilisateur (PLT-2)
 

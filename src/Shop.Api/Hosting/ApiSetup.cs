@@ -24,7 +24,6 @@ public static class ApiSetup
 
         services.AddProblemDetails(options => options.CustomizeProblemDetails = Customize);
         services.AddExceptionHandler<GlobalExceptionHandler>();
-        services.AddValidation();
 
         services.AddAuthentication(UserIdAuthenticationHandler.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, UserIdAuthenticationHandler>(UserIdAuthenticationHandler.SchemeName, null);
@@ -67,6 +66,7 @@ public static class ApiSetup
 
         app.MapHealthChecks("/health");
         app.MapCatalogEndpoints();
+        app.MapCartEndpoints();
 
         return app;
     }
