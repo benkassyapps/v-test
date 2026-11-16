@@ -42,7 +42,7 @@ Index `IX_SyncRuns_Status_Trigger (Status, Trigger, Id DESC)` pour les requêtes
 
 ```
 Shop.Domain/Catalog
-  Product                    entité : Create(ProviderProduct, now) ; ApplyFrom(ProviderProduct, now) → ProductChange ; Discontinue(now)
+  Product                    entité : Create(ProviderProduct, now) ; HasSameData(ProviderProduct) ; ApplyFrom(ProviderProduct, now) ; Discontinue(now) — la décision insertion/mise à jour/réactivation/retrait appartient à SyncPlanner
   ProviderProduct            record : ExternalId, Name, Category, Price, Stock, AvailabilityStatus, ProviderUpdatedAt
   CatalogSnapshot            liste validée de ProviderProduct (complète, sans doublon)
   SyncPlan / SyncPlanner     calcul PUR des changements (insérer / mettre à jour / retirer / réactiver) + compteurs

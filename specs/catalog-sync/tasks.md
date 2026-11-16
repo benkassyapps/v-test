@@ -5,16 +5,16 @@
 ## Bloc 2 — Domaine (partie catalogue)
 
 ### T2.3 — Entités et calcul de synchronisation
-- [ ] `Product` (`Create`, `ApplyFrom` → `ProductChange`, `Discontinue`), `ProviderProduct`, `CatalogSnapshot`.
-- [ ] `SyncPlanner.Plan(existing, snapshot)` → `SyncPlan` (insertions, mises à jour, retraits, réactivations, compteurs) et `SyncPlan.ApplyTo(...)`.
-- [ ] `DiscontinuationGuard` (seuil strict, cas du premier import).
-- [ ] `SyncRun` (`Start`, `Succeed`, `Fail(reason)`, `Skip`, `Interrupted`).
+- [x] `Product` (`Create`, `HasSameData`, `ApplyFrom`, `Discontinue`), `ProviderProduct`, `CatalogSnapshot`.
+- [x] `SyncPlanner.Plan(existing, snapshot)` → `SyncPlan` (insertions, mises à jour, retraits, réactivations, compteurs) et `SyncPlan.ApplyTo(...)`.
+- [x] `DiscontinuationGuard` (seuil strict, cas du premier import).
+- [x] `SyncRun` (`Start`, `Succeed`, `Fail(reason)`, `Skip`, `Interrupted`).
 - **Exigences** : CAT-R4, CAT-R5, CAT-R9, CAT-R11. **Tests unitaires** : données identiques → aucun changement ; changement de champ → mise à jour avec `LastUpdatedAt` ; produit absent → retrait ; produit revenu → réactivation ; seuil 50 % passe et 50 % + 1 bloque ; catalogue vide → bloqué ; catalogue local vide → jamais bloqué.
 
 ### T2.4 — Politiques d'Application
-- [ ] `SyncSchedulePolicy` (Cronos : dernier créneau échu, espacement 15 min → 2 h, prochaine tentative).
-- [ ] Règle `actionRequired` de `sync-status` (garde-fou, catalogue périmé, jamais réussi).
-- [ ] `ProductCursor` (encodage base64url `{"v":1,"id":…}`, décodage strict).
+- [x] `SyncSchedulePolicy` (Cronos : dernier créneau échu, espacement 15 min → 2 h, prochaine tentative).
+- [x] Règle `actionRequired` de `sync-status` (garde-fou, catalogue périmé, jamais réussi).
+- [x] `ProductCursor` (encodage base64url `{"v":1,"id":…}`, décodage strict).
 - **Exigences** : CAT-R2, CAT-R6, CAT-R12. **Tests unitaires** : tous les cas des scénarios du planificateur de `declenchement.feature` (avant ou après le créneau, déjà réussi, rattrapage après plusieurs jours, 1/3/6 échecs juste avant et juste après le délai) ; curseurs valides, tronqués, d'une version inconnue, avec un id ≤ 0.
 
 ---

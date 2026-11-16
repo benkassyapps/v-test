@@ -151,7 +151,7 @@ Fonctionnalité: Déclenchement de la synchronisation, planification et exclusiv
   @CAT-R2 @CAT-R8
   Scénario: Le planificateur rattrape une synchronisation échouée
     Étant donné que la dernière synchronisation réussie date du "2026-11-15T02:05:00Z"
-    Et qu'une synchronisation planifiée a échoué le "2026-11-16T02:01:00Z"
+    Et qu'une synchronisation planifiée a échoué le "2026-11-16T02:00:00Z"
     Et qu'il est "2026-11-16T02:15:00Z"
     Quand le planificateur de l'instance 1 effectue sa vérification
     Alors une synchronisation "Scheduled" a réussi sur l'instance 1

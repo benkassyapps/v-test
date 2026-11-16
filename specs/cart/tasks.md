@@ -5,11 +5,11 @@
 ## Bloc 2 — Domaine (partie panier)
 
 ### T2.1 — Socle des résultats et erreurs
-- [ ] `Result`, `Result<T>`, `DomainError(Code, Message, Extensions)` et catalogue des codes (`Shop.Domain/Common`).
+- [x] `Result`, `Result<T>`, `DomainError(Code, Message, Extensions)` et catalogue des codes (`Shop.Domain/Common`).
 - **Exigences** : PLT-3 (côté domaine). **Tests unitaires** : construction et propagation.
 
 ### T2.2 — Agrégat `Cart`
-- [ ] `Cart`, `CartLine`, `ProductSnapshot`, `CartChange` ; `AddItem`, `ChangeQuantity`, `RemoveLine`, `Total`, selon l'ordre des vérifications de [design §2](design.md#2-domaine-shopdomaincarts--règles-pures).
+- [x] `Cart`, `CartLine`, `ProductSnapshot`, `CartChange` ; `AddItem`, `ChangeQuantity`, `RemoveLine`, `Total`, selon l'ordre des vérifications de [design §2](design.md#2-domaine-shopdomaincarts--règles-pures).
 - **Exigences** : CART-R3 à CART-R11, CART-R14 (montants). **Tests unitaires**, un par règle au minimum :
   - nouvelle ligne : version 1, nom et prix copiés, panier +1 ;
   - réajout : cumul, ligne +1, panier +1, nom et prix inchangés ;

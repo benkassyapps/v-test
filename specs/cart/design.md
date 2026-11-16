@@ -33,7 +33,7 @@ Les contraintes CHECK, UNIQUE et les jetons de concurrence **doublent** les règ
 
 | Méthode | Ordre des vérifications → effet |
 |---|---|
-| `AddItem(ProductSnapshot? product, int qty, DateTimeOffset now)` | qty ∉ [1, 999] → `validation_failed` · produit null ou inactif → `product_unavailable` · ligne existante et `quantité + qty > 999` → `quantity_limit_exceeded` · ligne existante → `Quantity += qty`, `line.Version++` · sinon nouvelle ligne (`Id` v7, `Version = 1`, nom et prix copiés) · puis `cart.Version++` |
+| `AddItem(int productId, ProductSnapshot? product, int qty, Guid newLineId, DateTimeOffset now)` | qty ∉ [1, 999] → `validation_failed` · produit null ou inactif → `product_unavailable` · ligne existante et `quantité + qty > 999` → `quantity_limit_exceeded` · ligne existante → `Quantity += qty`, `line.Version++` · sinon nouvelle ligne (`Id` v7, `Version = 1`, nom et prix copiés) · puis `cart.Version++` |
 | `ChangeQuantity(Guid lineId, int qty, long expectedVersion, bool productActive)` | qty ∉ [1, 999] → `validation_failed` · ligne absente → `cart_line_not_found` · `line.Version ≠ expectedVersion` → `cart_line_version_conflict` (+ `currentVersion`) · `qty == Quantity` → `Unchanged` · produit inactif et `qty > Quantity` → `product_unavailable` · sinon `Quantity = qty`, `line.Version++`, `cart.Version++` |
 | `RemoveLine(Guid lineId, long expectedVersion)` | ligne absente → `cart_line_not_found` · version différente → `cart_line_version_conflict` · sinon suppression, `cart.Version++` |
 | `Total` | `Σ line.UnitPrice × line.Quantity` (valeurs conservées, CART-R6.3), y compris les produits retirés |

@@ -21,3 +21,24 @@ Revue sur le diff indexé (67 fichiers). 10 constats, vérifiés un par un avant
 | 10 | Le contrôle RCSI (`IHostedService.StartAsync`) retarde le démarrage de l'instance si la base est lente ou injoignable. | **Corrigé** | Transformé en `BackgroundService` qui cède immédiatement la main. |
 
 **Résultat après corrections** : build sans avertissement ; 75 tests unitaires et 5 tests d'intégration verts (1 test ignoré volontairement jusqu'à T6.4).
+
+## Bloc 2 — Domaine — `/code-review high` — 2026-11-16
+
+Revue sur le diff indexé (20 fichiers : agrégat panier, domaine de la synchro, politiques, curseur). 10 constats.
+
+| # | Constat | Décision | Justification / correction |
+|---|---|---|---|
+| 1 | `RetryDelay` : `15 min × 2^30` dépasse `TimeSpan.MaxValue` → `OverflowException` à chaque tick après 31 échecs consécutifs (~2,5 jours de panne) : le planificateur ne repartirait plus seul. | **Corrigé** | Doublement itératif comparé au plafond avant de doubler. Test : 5, 31, 64 et `int.MaxValue` échecs → 2 h, sans exception. |
+| 2 | Curseur sérialisé en `{"V":…,"Id":…}` au lieu du format documenté `{"v":…,"id":…}` ; les tests de rejet passaient pour une mauvaise raison (casse). | **Corrigé** | `JsonPropertyName("v"/"id")`. Test du format documenté exact (décodage et encodage identiques). |
+| 3 | La validation de l'instantané ne vérifie ni les textes nuls ni leur longueur : un produit invalide passerait et ferait échouer l'écriture en base à chaque synchro. | **Corrigé** | Longueurs partagées avec le schéma (`Product.Max*Length`), valeurs nulles refusées : `InvalidSnapshot` avant toute écriture. |
+| 4 | Prix à plus de 2 décimales : stocké arrondi (`decimal(18,2)`), puis jugé différent à chaque synchro (fausse mise à jour quotidienne). | **Corrigé** | Prix arrondi à 2 décimales dans l'instantané. Test d'idempotence avec 9.999. |
+| 5 | Fenêtre fixe de 35 jours : un cron rare (au-delà d'un mois) ne redeviendrait jamais dû. | **Corrigé** | Fenêtres croissantes (1 h, 2 j, 400 j, 5 ans). Test avec un cron annuel (29 février). |
+| 6 | Tâches T2.x cochées sans mise à jour de `traceability.md`. | **Corrigé** | Nouveau statut 🟡 (règles testées unitairement, intégration à venir) ; matrice mise à jour. |
+| 7 | Le design annonce `ApplyFrom → ProductChange`, absent du code. | **Corrigé (spec)** | La décision insertion/mise à jour/réactivation/retrait appartient à `SyncPlanner` ; design et tâche alignés sur le code. |
+| 8 | `Cart.Lines` renvoie la `List` interne : un appelant peut la reconvertir et modifier les lignes hors de l'agrégat. | **Corrigé** | Vue `ReadOnlyCollection` créée une fois dans le constructeur. |
+| 9 | Coût : énumération de toutes les occurrences sur 35 jours à chaque tick (cron fréquent). | **Corrigé** | Couvert par la correction 5 (la plus petite fenêtre suffit). |
+| 10 | `AddItem(productId, product?)` : paramètre redondant et exception si incohérents ; le design annonce `AddItem(product?)`. | **Rejeté** | L'identifiant demandé est nécessaire pour signaler un produit inexistant (`product` est alors nul) ; l'incohérence entre les deux est une erreur de programmation, d'où l'exception. Le design est aligné sur cette signature. |
+
+**Résultat après corrections** : build sans avertissement ; 169 tests unitaires et 5 tests d'intégration verts.
+
+**Correction de spec relevée pendant l'implémentation (hors revue)** : le scénario « Le planificateur rattrape une synchronisation échouée » (échec à 02:01, vérification à 02:15) contredisait l'espacement de 15 min ajouté ensuite (CAT-R2.4) ; l'échec est placé à 02:00.
