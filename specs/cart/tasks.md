@@ -30,7 +30,7 @@
 
 ### T4.2 — Unité de travail transactionnelle
 - [ ] `CartStore.MutateAsync` : `UPDLOCK, HOLDLOCK, ROWLOCK` + chargement des lignes, création implicite, lecture du produit en `REPEATABLEREAD`, rollback sur erreur et sur `Unchanged`, **aucun rejeu automatique**.
-- [ ] `CartStore.GetOrCreateAsync` (filet de sécurité 2601/2627) et `CartReader.GetViewAsync` (requête unique en projection).
+- [ ] `CartStore.GetOrCreateAsync` (filet de sécurité 2601/2627) et `CartReader.GetViewAsync` (requête unique en projection), tous deux sous la stratégie de rejeu idempotente (reportée depuis T1.5).
 - **Exigences** : CART-R1, CART-R2, CART-R7, CART-R9, CART-R10, CART-R12, CART-R15.
 
 ### T4.3 — Service et endpoints
@@ -52,6 +52,7 @@
 
 ### T4.5 — Scénarios d'acceptation du panier et de la plateforme
 - [ ] Étapes Reqnroll et inclusion de `creation-consultation.feature`, `ajout.feature`, `modification-suppression.feature`, `concurrence.feature`, `panier-et-synchronisation.feature`, `platform/acceptance/plateforme.feature`.
+- [ ] Tests de non-régression issus de la revue du bloc 1 (`docs/ai-reviews.md`) : une réponse 503 (panne de base simulée) porte l'en-tête `X-Instance` ; une requête panier sans `X-User-Id` avec `Accept: text/plain` reçoit 401 et non 500.
 - **Exigences** : CART-R1 à CART-R17, PLT-1, PLT-2, PLT-3, PLT-6, PLT-7. **Fin** : tous les scénarios verts sur 2 instances.
 
 **🔍 Fin du bloc 4** : `/code-review high` (attention : verrous, ordre des verrous, rollback, création implicite) puis **`/security-review`** (identification, clé admin, isolation des paniers, validation, ProblemDetails, SQL brut paramétré) → tri des constats → validation → commit.

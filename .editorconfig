@@ -1,0 +1,41 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,csproj,props,slnx,xml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# Style
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_prefer_braces = when_multiline:suggestion
+dotnet_style_qualification_for_field = false:suggestion
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+dotnet_sort_system_directives_first = true
+
+# Règles d'analyse jugées trop bruyantes pour ce projet
+dotnet_diagnostic.CA1515.severity = none   # types publics nécessaires aux tests et à WebApplicationFactory
+dotnet_diagnostic.CA1848.severity = none   # LoggerMessage utilisé là où c'est pertinent, pas imposé partout
+dotnet_diagnostic.CA2007.severity = none   # pas de SynchronizationContext en ASP.NET Core
+dotnet_diagnostic.CA1062.severity = none   # nullabilité activée
+dotnet_diagnostic.CA1711.severity = none
+dotnet_diagnostic.IDE0005.severity = none
+
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none   # noms de tests lisibles avec des underscores
+dotnet_diagnostic.CA1515.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
+# Migrations EF générées : exclues des règles de style et d'analyse.
+[src/Shop.Infrastructure/Persistence/Migrations/**.cs]
+generated_code = true

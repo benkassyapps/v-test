@@ -32,7 +32,7 @@
 
 ### T3.3 — Service de synchronisation
 - [ ] `SqlCatalogSyncLock` (DistributedLock.SqlServer, `HandleLostToken`).
-- [ ] `CatalogStore.ApplyAsync` (une transaction, rejeu idempotent autorisé).
+- [ ] `CatalogStore.ApplyAsync` (une transaction) et **stratégie de rejeu explicite** pour les opérations idempotentes (`SqlServerRetryingExecutionStrategy`, 3 essais, 2 s max ; [platform/design.md §6](../platform/design.md#6-persistance-et-migrations-plt-5) ; reportée depuis T1.5).
 - [ ] `CatalogSyncService.RunAsync(trigger, force)` : déroulé complet de [design §3](design.md#3-déroulé-dune-synchronisation-catalogsyncservicerunasync), logs `CatalogSync*`, annulation indépendante de la requête HTTP.
 - **Exigences** : CAT-R1, CAT-R3, CAT-R8, CAT-R10, CAT-R11, CAT-R12. **Tests d'intégration** : deux runs simultanés → un seul applique ; **coupure de la connexion du verrou → verrou libéré, run suivant possible (CAT-R10.4)** ; panne de base pendant l'application → catalogue inchangé.
 

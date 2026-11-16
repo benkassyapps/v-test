@@ -51,7 +51,7 @@
 | PLT-2 Identification | plateforme.feature | — | ⏳ |
 | PLT-3 Contrat d'erreurs | plateforme.feature + codes vérifiés dans tous les scénarios | — | ⏳ |
 | PLT-4 Démarrage reproductible | — | **Vérification manuelle** (`docker compose up --build`, procédure du README). Exemptée dans `TraceabilityTests`. | ⏳ |
-| PLT-5 Migrations et RCSI | — | Intégration : migrations appliquées, RCSI actif | ⏳ |
+| PLT-5 Migrations et RCSI | — | Intégration : `DatabaseTests` (migrations appliquées, RCSI actif) | ✅ |
 | PLT-6 Observabilité | plateforme.feature (santé) | — | ⏳ |
 | PLT-7 OpenAPI | plateforme.feature | — | ⏳ |
-| PLT-8 Secrets | — | Unitaires : aucun secret non vide dans les fichiers de configuration versionnés ; `/security-review` final | ⏳ |
+| PLT-8 Secrets | — | Unitaires : `NoSecretsInRepositoryTests` (appsettings, docker-compose, .gitignore) ; `/security-review` final | ✅ |

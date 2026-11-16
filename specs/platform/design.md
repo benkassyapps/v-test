@@ -60,7 +60,7 @@ Shop.slnx
 ## 4. Identification de l'utilisateur (PLT-2)
 
 - `UserIdAuthenticationHandler : AuthenticationHandler<…>` lit `X-User-Id`, le valide avec `^[A-Za-z0-9._@-]{1,64}$` et crée un `ClaimsPrincipal` (claim `sub`). En cas d'absence ou d'invalidité : échec, puis challenge en `401 user_not_identified` au format ProblemDetails.
-- Les endpoints panier exigent `RequireAuthorization()` et obtiennent l'utilisateur par `ICurrentUser` (lecture du claim). Remplacer ce handler par `AddJwtBearer` ne touche à aucun endpoint.
+- Les endpoints panier exigent `RequireAuthorization()` et lisent l'utilisateur par `User.GetUserId()` (extension sur `ClaimsPrincipal`, claim `sub`). Ils le **passent en paramètre** aux services d'Application (`CartService.AddItemAsync(userId, …)`). Il n'y a pas de port `ICurrentUser` : les cas d'usage restent explicites et testables sans contexte HTTP. Remplacer ce handler par `AddJwtBearer` ne touche à aucun endpoint.
 - La colonne `Carts.UserId` utilise une **collation binaire** (`Latin1_General_100_BIN2`) : l'identifiant est opaque et sensible à la casse (`alice` ≠ `Alice`). La collation par défaut de SQL Server, insensible à la casse, aurait fusionné les deux.
 - **Clé d'administration** : un filtre d'endpoint compare `X-Admin-Key` à `Admin:ApiKey` avec `CryptographicOperations.FixedTimeEquals` (pas de fuite par le temps de réponse). Absente ou invalide : `403 admin_key_invalid`. Une clé vide en configuration désactive les endpoints admin (403 systématique).
 

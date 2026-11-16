@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Tests d'acceptation : exécutent les critères d'acceptation Gherkin rédigés sous specs/ (source unique).
+    Les .feature sont inclus explicitement, bloc par bloc (specs/platform/tasks.md) : un scénario n'est jamais
+    « en attente » dans une exécution verte. TraceabilityTests vérifie au bloc 6 que tous sont inclus.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Shop.Testing\Shop.Testing.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Reqnroll.xunit.v3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="reqnroll.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- Fichiers .feature exécutés (ajoutés au fil des blocs 3 et 4). -->
+  <ItemGroup>
+  </ItemGroup>
+</Project>
