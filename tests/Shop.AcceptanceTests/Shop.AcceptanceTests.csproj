@@ -8,6 +8,8 @@
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- Code généré par Reqnroll dans obj/ et non à côté des .feature (specs/ reste propre). -->
+    <ReqnrollUseIntermediateOutputPathForCodeBehind>true</ReqnrollUseIntermediateOutputPathForCodeBehind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Shop.Testing\Shop.Testing.csproj" />
@@ -26,5 +28,8 @@
   </ItemGroup>
   <!-- Fichiers .feature exécutés (ajoutés au fil des blocs 3 et 4). -->
   <ItemGroup>
+    <ReqnrollFeatureFiles Include="..\..\specs\catalog-sync\acceptance\synchronisation.feature" Link="Features\catalog-sync\synchronisation.feature" />
+    <ReqnrollFeatureFiles Include="..\..\specs\catalog-sync\acceptance\declenchement.feature" Link="Features\catalog-sync\declenchement.feature" />
+    <ReqnrollFeatureFiles Include="..\..\specs\catalog-sync\acceptance\liste-produits.feature" Link="Features\catalog-sync\liste-produits.feature" />
   </ItemGroup>
 </Project>

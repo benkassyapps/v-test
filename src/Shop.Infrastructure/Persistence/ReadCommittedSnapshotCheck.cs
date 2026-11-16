@@ -45,7 +45,7 @@ internal sealed partial class ReadCommittedSnapshotCheck(
         Message = "READ_COMMITTED_SNAPSHOT est désactivé : les lectures peuvent être bloquées par les écritures en cours. Appliquer les migrations avec le migrateur.")]
     private static partial void LogDisabled(ILogger logger);
 
-    [LoggerMessage(EventId = 2003, Level = LogLevel.Warning,
+    [LoggerMessage(EventId = 2003, EventName = nameof(LogEvents.ReadCommittedSnapshotCheckFailed), Level = LogLevel.Warning,
         Message = "Impossible de vérifier READ_COMMITTED_SNAPSHOT au démarrage.")]
     private static partial void LogCheckFailed(ILogger logger, Exception exception);
 }

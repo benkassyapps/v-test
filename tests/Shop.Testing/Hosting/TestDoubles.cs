@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging.Testing;
-using Microsoft.Extensions.Time.Testing;
 using Shop.Testing.Fakes;
 
 namespace Shop.Testing.Hosting;
@@ -12,7 +11,7 @@ public sealed class TestDoubles
 {
     public static readonly DateTimeOffset DefaultNow = new(2026, 11, 16, 10, 0, 0, TimeSpan.Zero);
 
-    public FakeTimeProvider Clock { get; } = new(DefaultNow);
+    public TestClock Clock { get; } = new(DefaultNow);
 
     public FakeDummyJsonHandler Provider { get; } = new();
 

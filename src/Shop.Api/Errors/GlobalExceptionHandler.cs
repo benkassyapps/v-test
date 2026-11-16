@@ -58,6 +58,6 @@ internal sealed partial class GlobalExceptionHandler(
         Message = "Exception non gérée lors du traitement de {Method} {Path}.")]
     private static partial void LogUnhandled(ILogger logger, Exception exception, string method, string path);
 
-    [LoggerMessage(EventId = 9001, Level = LogLevel.Information, Message = "Requête mal formée rejetée : {Reason}")]
+    [LoggerMessage(EventId = 9001, EventName = nameof(LogEvents.BadRequestRejected), Level = LogLevel.Information, Message = "Requête mal formée rejetée : {Reason}")]
     private static partial void LogBadRequest(ILogger logger, string reason);
 }

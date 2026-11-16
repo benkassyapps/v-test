@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Scalar.AspNetCore;
 using Shop.Api.Auth;
+using Shop.Api.Endpoints;
 using Shop.Api.Errors;
 using Shop.Application.Common;
 using Shop.Domain.Common;
@@ -65,6 +66,7 @@ public static class ApiSetup
         }
 
         app.MapHealthChecks("/health");
+        app.MapCatalogEndpoints();
 
         return app;
     }

@@ -30,6 +30,9 @@ public sealed class SyncRun
 {
     public const int MaxErrorLength = 1000;
 
+    /// <summary>Cause enregistrée pour un run resté « en cours » après l'arrêt brutal de son instance, ou dont le verrou a été perdu.</summary>
+    public const string InterruptedMessage = "Synchronisation interrompue (arrêt de l'instance qui l'exécutait ou verrou perdu) : aucune modification enregistrée par ce run.";
+
     private SyncRun()
     {
     }
@@ -114,10 +117,6 @@ public sealed class SyncRun
         ActiveBefore = activeBefore;
         WouldDiscontinue = wouldDiscontinue;
     }
-
-    /// <summary>Run resté « en cours » après l'arrêt brutal de son instance.</summary>
-    public void MarkInterrupted(DateTimeOffset now) =>
-        Fail(SyncFailureReason.Interrupted, "Synchronisation interrompue (arrêt de l'instance qui l'exécutait).", now);
 
     private void EnsureRunning()
     {

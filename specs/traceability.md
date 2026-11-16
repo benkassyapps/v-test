@@ -8,18 +8,18 @@
 
 | Exigence | Scénarios d'acceptation | Tests xUnit | Statut |
 |---|---|---|---|
-| CAT-R1 Récupération complète | synchronisation.feature (première synchro, panne en page 2, instantané incomplet) | Unitaires : validation de l'instantané (`SyncPlannerTests`) | 🟡 |
-| CAT-R2 Synchro quotidienne | declenchement.feature (scénarios du planificateur, espacement des tentatives) | Unitaires : `SyncSchedulePolicyTests` (créneau, rattrapage, espacement, débordement, cron rare) | 🟡 |
-| CAT-R3 Déclenchement manuel | declenchement.feature (résumé, 403, forçage, 502, historique) | Unitaires : comparaison de la clé d'administration | 🟡 |
-| CAT-R4 Sans doublon | synchronisation.feature (première synchro, idempotence, mise à jour) | Unitaires : `SyncPlannerTests` (idempotence, arrondi des prix) ; Intégration : index unique `ExternalId` | 🟡 |
-| CAT-R5 Informations conservées | synchronisation.feature (première synchro, mise à jour) | Unitaires : `SyncPlannerTests` | 🟡 |
-| CAT-R6 Liste paginée | liste-produits.feature (parcours, retirés, défaut, stabilité, paramètres invalides) | Unitaires : encodage/décodage du curseur | 🟡 |
-| CAT-R7 Indépendance fournisseur | liste-produits.feature, ajout.feature, declenchement.feature (502) | — | ⏳ |
-| CAT-R8 Cohérence et rattrapage | synchronisation.feature (panne fournisseur, erreur de base, rattrapage), declenchement.feature (rattrapage planifié) | Unitaires : cycle de vie de `SyncRun` | 🟡 |
-| CAT-R9 Produits retirés | synchronisation.feature (retrait, réactivation), liste-produits.feature, modification-suppression.feature | Unitaires : `SyncPlannerTests` | 🟡 |
-| CAT-R10 Exécution exclusive | declenchement.feature (409, Skipped, planificateurs simultanés) | Intégration : libération du verrou à la coupure de connexion (CAT-R10.4) | ⏳ |
-| CAT-R11 Garde-fou de retrait massif | synchronisation.feature (catalogue vide, seuil, forçage, première synchro), declenchement.feature (422, planificateur) | Unitaires : seuil strict, catalogue vide, première synchro | 🟡 |
-| CAT-R12 Signalement à l'exploitant | declenchement.feature (log du garde-fou, log d'échec, catalogue périmé, état à jour, 403) | Unitaires : `actionRequired`, prochaine tentative, diagnostic du run | 🟡 |
+| CAT-R1 Récupération complète | synchronisation.feature (première synchro, panne en page 2, instantané incomplet) | Unitaires : validation de l'instantané ; Intégration : pagination du fournisseur, total incohérent | ✅ |
+| CAT-R2 Synchro quotidienne | declenchement.feature (scénarios du planificateur, espacement des tentatives) | Unitaires : `SyncSchedulePolicyTests` (créneau, rattrapage, espacement, débordement, cron rare) | ✅ |
+| CAT-R3 Déclenchement manuel | declenchement.feature (résumé, 403, forçage, 502, historique) | Unitaires : comparaison de la clé d'administration | ✅ |
+| CAT-R4 Sans doublon | synchronisation.feature (première synchro, idempotence, mise à jour) | Unitaires : idempotence, arrondi des prix ; Intégration : index unique `ExternalId` | ✅ |
+| CAT-R5 Informations conservées | synchronisation.feature (première synchro, mise à jour) | Unitaires : `SyncPlannerTests` | ✅ |
+| CAT-R6 Liste paginée | liste-produits.feature (parcours, retirés, défaut, stabilité, paramètres invalides) | Unitaires : curseur ; Intégration : plan d'exécution (recherche sur l'index clusterisé) | ✅ |
+| CAT-R7 Indépendance fournisseur | liste-produits.feature, ajout.feature, declenchement.feature (502) | Intégration : panne du fournisseur renvoyée comme échec explicite | 🟡 (partie panier au bloc 4) |
+| CAT-R8 Cohérence et rattrapage | synchronisation.feature (panne fournisseur, erreur de base, rattrapage), declenchement.feature (rattrapage planifié) | Unitaires : cycle de vie de `SyncRun` ; Intégration : panne de base pendant l'application | ✅ |
+| CAT-R9 Produits retirés | synchronisation.feature (retrait, réactivation), liste-produits.feature, modification-suppression.feature | Unitaires : `SyncPlannerTests` | 🟡 (partie panier au bloc 4) |
+| CAT-R10 Exécution exclusive | declenchement.feature (409, Skipped, planificateurs simultanés) | Intégration : verrou exclusif entre instances, libération à la coupure de connexion (`KILL`), synchros manuelles simultanées | ✅ |
+| CAT-R11 Garde-fou de retrait massif | synchronisation.feature (catalogue vide, seuil, forçage, première synchro), declenchement.feature (422, planificateur) | Unitaires : seuil strict, catalogue vide, première synchro | ✅ |
+| CAT-R12 Signalement à l'exploitant | declenchement.feature (log du garde-fou, log d'échec, catalogue périmé, état à jour, 403) | Unitaires : `actionRequired`, prochaine tentative, diagnostic du run | ✅ |
 
 ## Panier
 

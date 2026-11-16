@@ -42,3 +42,29 @@ Revue sur le diff indexé (20 fichiers : agrégat panier, domaine de la synchro,
 **Résultat après corrections** : build sans avertissement ; 169 tests unitaires et 5 tests d'intégration verts.
 
 **Correction de spec relevée pendant l'implémentation (hors revue)** : le scénario « Le planificateur rattrape une synchronisation échouée » (échec à 02:01, vérification à 02:15) contredisait l'espacement de 15 min ajouté ensuite (CAT-R2.4) ; l'échec est placé à 02:00.
+
+## Bloc 3 — Catalogue — `/code-review high` — 2026-11-16
+
+Revue sur le diff indexé (42 fichiers : synchronisation, fournisseur, verrou, planificateur, endpoints, scénarios). 10 constats.
+
+| # | Constat | Décision | Justification / correction |
+|---|---|---|---|
+| 1 | Après le commit du catalogue, l'écriture du run « réussi » est séparée et non protégée : si elle échoue, le client reçoit 503 « aucune modification » alors que le catalogue a changé, et le run sera déclaré interrompu. | **Corrigé** | La réussite du run est écrite **dans la transaction du catalogue** (`ExecuteUpdate` avant le commit). |
+| 2 | Erreur du fournisseur enveloppée deux fois (message dupliqué) et `reason` toujours `provider_error`, même pour un instantané invalide. | **Corrigé** | L'erreur du fournisseur est renvoyée telle quelle (motif `invalid_snapshot` conservé). |
+| 3 | **Le verrou n'est pas une barrière** : la perte du verrou n'est détectée qu'au keepalive (jusqu'à 30 s) ; une autre instance peut reprendre le verrou, déclarer le run interrompu et appliquer, pendant que la première valide aussi (et réécrit « réussi » par-dessus « interrompu »). | **Corrigé** | Barrière sur la ligne du run (`UPDLOCK`) au début de la transaction d'application ; interruption des orphelins et fins de run en mises à jour ensemblistes conditionnelles (`WHERE Status = Running`). Deux tests d'intégration : application abandonnée si le run a été repris ; run terminé jamais réécrit. Design §3 mis à jour. |
+| 4 | Une annulation due à la perte du verrou peut lever une `SqlException` (et non `OperationCanceledException`) : le run serait classé « erreur de base » sans log `CatalogSyncLockLost`. | **Corrigé** | Le filtre « verrou perdu » s'applique à toute exception. |
+| 5 | Sur perte du verrou, message « la base a échoué pendant l'application », même pendant la récupération des produits. | **Corrigé** | Erreur dédiée `SyncInterrupted` (« verrou de synchronisation perdu »). |
+| 6 | Pipeline de résilience aux valeurs par défaut de la bibliothèque (30 s au total) alors que le design prévoit 10 s par tentative et 60 s au total. | **Corrigé** | Valeurs du design posées dans le code, surchargeables par `CatalogSync:Http`. |
+| 7 | Délai de rejeu `Task.Delay` sans `TimeProvider`, contraire à la convention du dépôt. | **Corrigé** | `Task.Delay(delay, TimeProvider, …)` ; l'horloge de test (`TestClock`) garde des minuteries réelles. |
+| 8 | `GetStatusAsync` fait 3 allers-retours séquentiels dont une requête en double. | **Rejeté** | Endpoint d'administration rarement appelé, requêtes indexées sur une petite table : la clarté de requêtes indépendantes prime sur un gain négligeable. |
+| 9 | Ré-emballage fragile de l'erreur de l'instantané, fondé sur le texte du message. | **Corrigé** | Le résultat de `CatalogSnapshot.Create` est renvoyé directement. |
+| 10 | Identifiants de log 1006–1008 (et 2003, 9001) absents du registre `LogEvents` et sans `EventName`. | **Corrigé** | Registre complété et commenté (plages par domaine) ; tous les `[LoggerMessage]` utilisent `EventName = nameof(LogEvents.X)`. |
+
+**Résultat après corrections** : build sans avertissement ; 169 tests unitaires, 16 tests d'intégration et 50 scénarios d'acceptation verts.
+
+**Changements de design décidés pendant l'implémentation (hors revue)** :
+- Index `IX_Products_Status_Id` retiré : non couvrant, il aurait imposé une recherche par ligne ; la pagination utilise la clé primaire clusterisée (vérifié par un test du plan d'exécution).
+- Rejeu idempotent par une boucle explicite `TransientRetry` sur un contexte EF neuf à chaque tentative, plutôt que `SqlServerRetryingExecutionStrategy` (qui, sur un contexte unique, rejouerait sur des entités déjà modifiées en mémoire).
+- Horloge de test `TestClock` réglable dans les deux sens (`FakeTimeProvider` interdit de revenir en arrière, ce que les scénarios du planificateur exigent).
+- Code généré par Reqnroll redirigé vers `obj/` (`ReqnrollUseIntermediateOutputPathForCodeBehind`) pour garder `specs/` propre.
+- Vérification par mutation : rendre le seuil du garde-fou non strict (`>=`) fait échouer 2 scénarios.

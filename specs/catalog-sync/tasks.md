@@ -22,31 +22,31 @@
 ## Bloc 3 — Catalogue
 
 ### T3.1 — Persistance du catalogue
-- [ ] Configurations EF `Products` et `SyncRuns` (types, CHECK, `UX_Products_ExternalId`, `IX_Products_Status_Id`, `IX_SyncRuns_Status_Trigger`), migration `Catalog`.
-- [ ] `ProductReader` (keyset), `SyncRunStore` (état du planificateur, historique keyset, correction des runs `Running` orphelins).
-- **Exigences** : CAT-R4, CAT-R5, CAT-R6. **Tests d'intégration** : l'index unique refuse un doublon d'`ExternalId` ; le plan d'exécution de la liste utilise un seek sur `IX_Products_Status_Id` (vérification consignée).
+- [x] Configurations EF `Products` et `SyncRuns` (types, CHECK, `UX_Products_ExternalId`, `IX_SyncRuns_Status_Trigger`), migration `Catalog`. Pagination servie par la clé primaire clusterisée (index secondaire `(Status, Id)` écarté : non couvrant).
+- [x] `ProductReader` (keyset), `SyncRunStore` (état du planificateur, historique keyset, correction des runs `Running` orphelins).
+- **Exigences** : CAT-R4, CAT-R5, CAT-R6. **Tests d'intégration** : l'index unique refuse un doublon d'`ExternalId` ; le plan d'exécution de la liste est une recherche sur l'index clusterisé, sans parcours complet ni tri (`Keyset_page_uses_clustered_index_seek`).
 
 ### T3.2 — Fournisseur DummyJSON
-- [ ] `DummyJsonCatalogProvider` : client typé, `select`, pagination jusqu'à `total`, validation de complétude et de données, `AddStandardResilienceHandler`, erreurs `ProviderUnavailable` / `InvalidSnapshot`.
+- [x] `DummyJsonCatalogProvider` : client typé, `select`, pagination jusqu'à `total`, validation de complétude et de données, `AddStandardResilienceHandler`, erreurs `ProviderUnavailable` / `InvalidSnapshot`.
 - **Exigences** : CAT-R1, CAT-R7. **Tests d'intégration** (`FakeDummyJsonHandler`) : pagination complète ; page vide prématurée, doublon, total incohérent → `InvalidSnapshot` ; 5xx persistants → `ProviderUnavailable` après les nouvelles tentatives.
 
 ### T3.3 — Service de synchronisation
-- [ ] `SqlCatalogSyncLock` (DistributedLock.SqlServer, `HandleLostToken`).
-- [ ] `CatalogStore.ApplyAsync` (une transaction) et **stratégie de rejeu explicite** pour les opérations idempotentes (`SqlServerRetryingExecutionStrategy`, 3 essais, 2 s max ; [platform/design.md §6](../platform/design.md#6-persistance-et-migrations-plt-5) ; reportée depuis T1.5).
-- [ ] `CatalogSyncService.RunAsync(trigger, force)` : déroulé complet de [design §3](design.md#3-déroulé-dune-synchronisation-catalogsyncservicerunasync), logs `CatalogSync*`, annulation indépendante de la requête HTTP.
+- [x] `SqlCatalogSyncLock` (DistributedLock.SqlServer, `HandleLostToken`).
+- [x] `CatalogStore.ApplyAsync` (une transaction) et **rejeu explicite** des opérations idempotentes (`TransientRetry`, 3 essais, 2 s max, contexte neuf à chaque tentative ; [platform/design.md §6](../platform/design.md#6-persistance-et-migrations-plt-5) ; reporté depuis T1.5).
+- [x] `CatalogSyncService` (`RunManualAsync`, `RunScheduledAsync`) : déroulé complet de [design §3](design.md#3-déroulé-dune-synchronisation-catalogsyncservicerunasync), logs `CatalogSync*`, annulation indépendante de la requête HTTP.
 - **Exigences** : CAT-R1, CAT-R3, CAT-R8, CAT-R10, CAT-R11, CAT-R12. **Tests d'intégration** : deux runs simultanés → un seul applique ; **coupure de la connexion du verrou → verrou libéré, run suivant possible (CAT-R10.4)** ; panne de base pendant l'application → catalogue inchangé.
 
 ### T3.4 — Planificateur
-- [ ] `CatalogSyncScheduler.CheckAsync()` (politique + revérification sous verrou), `CatalogSyncHostedService` (`PeriodicTimer`, `SchedulerEnabled`).
-- **Exigences** : CAT-R2, CAT-R10. **Tests d'intégration** : deux planificateurs simultanés → un seul run réussi pour le créneau.
+- [x] `CatalogSyncScheduler.CheckAsync()` (politique + revérification sous verrou), `CatalogSyncHostedService` (`PeriodicTimer`, `SchedulerEnabled`).
+- **Exigences** : CAT-R2, CAT-R10. **Tests** : deux planificateurs simultanés → un seul run réussi pour le créneau (scénario d'acceptation).
 
 ### T3.5 — Endpoints
-- [ ] `GET /api/products` (limit 1–100, curseur, 400 `validation_failed`).
-- [ ] `POST /api/admin/catalog/sync?force=`, `GET /api/admin/catalog/sync-runs`, `GET /api/admin/catalog/sync-status`, avec mapping des résultats vers 200/403/409/422/502/503.
+- [x] `GET /api/products` (limit 1–100, curseur, 400 `validation_failed`).
+- [x] `POST /api/admin/catalog/sync?force=`, `GET /api/admin/catalog/sync-runs`, `GET /api/admin/catalog/sync-status`, avec mapping des résultats vers 200/403/409/422/502/503.
 - **Exigences** : CAT-R3, CAT-R6, CAT-R12, PLT-3.
 
 ### T3.6 — Scénarios d'acceptation du catalogue
-- [ ] Étapes Reqnroll et inclusion de `synchronisation.feature`, `declenchement.feature`, `liste-produits.feature`.
-- **Exigences** : CAT-R1 à CAT-R12. **Fin** : tous les scénarios verts sur 2 instances.
+- [x] Étapes Reqnroll et inclusion de `synchronisation.feature`, `declenchement.feature`, `liste-produits.feature` (code généré dans `obj/`, `specs/` reste propre).
+- **Exigences** : CAT-R1 à CAT-R12. **Fin** : 50 scénarios verts sur 2 instances ; mutation du seuil du garde-fou (`>` → `>=`) détectée par 2 scénarios.
 
 **🔍 Fin du bloc 3** : `/code-review high` (attention : verrou, transaction, rollback, runs orphelins) → tri → validation → commit.

@@ -19,7 +19,7 @@
 | `LastUpdatedAt` | `datetimeoffset` | Dernier changement **effectif** des données locales (CAT-R5.2). |
 | `DiscontinuedAt` | `datetimeoffset null` | Date du retrait. |
 
-- Index `IX_Products_Status_Id (Status, Id)` : sert la pagination keyset des produits actifs (seek direct).
+- Pagination keyset servie par la **clé primaire clusterisée** : `Id > @dernier ORDER BY Id` est une recherche de plage lue dans l'ordre, arrêtée après `limit + 1` lignes, le filtre `Status = Active` écartant les rares produits retirés. Pas d'index secondaire `(Status, Id)` : non couvrant, il imposerait une recherche dans la table pour chaque ligne (*key lookup*). Vérifié par un test du plan d'exécution (recherche sur l'index clusterisé, ni parcours complet ni tri). *Changement décidé à l'implémentation (T3.1).*
 - **Choix** : pas de colonne « dernière vérification » par produit. La mettre à jour à chaque synchro écrirait toutes les lignes à chaque run, ce qui contredit l'idempotence (CAT-R4.3). La date de dernière vérification d'un produit actif est celle du dernier run réussi (`SyncRuns`). *La décision D4 de `requirements.md` est corrigée en ce sens.*
 
 ### `SyncRuns`
@@ -52,9 +52,10 @@ Shop.Domain/Catalog
 Shop.Application/Catalog
   ICatalogProvider           FetchSnapshotAsync() → CatalogSnapshot   (lève ProviderUnavailable / InvalidSnapshot)
   ICatalogSyncLock           TryAcquireAsync() → ILockHandle? (avec HandleLostToken)
-  ICatalogStore              ApplyAsync(Func<IReadOnlyList<Product>, Result<SyncCounts>>) : charge, applique, valide en UNE transaction
-  ISyncRunStore              Add/Update de SyncRun, état pour le planificateur et pour sync-status, historique paginé
-  CatalogSyncService         RunAsync(trigger, force) : orchestration (§3)
+  ICatalogStore              ApplyAsync(runId, Func<produits, Result<CatalogChanges>>) : barrière sur le run, applique,
+                             passe le run à « réussi », valide le tout en UNE transaction
+  ISyncRunStore              Add ; CompleteAsync conditionnel (« encore en cours ») ; état du planificateur et de sync-status ; historique
+  CatalogSyncService         RunManualAsync(force) / RunScheduledAsync() : orchestration (§3)
   SyncSchedulePolicy         décision PURE : la synchro planifiée est-elle due ? prochaine tentative ? (§4)
   CatalogSyncScheduler       CheckAsync() : appelle la politique puis RunAsync(Scheduled)
   SyncStatusQuery            état pour l'exploitant (§5)
@@ -79,21 +80,23 @@ Shop.Infrastructure/Catalog
 4. run ← SyncRun.Start(trigger, instance, forced) ; enregistré et validé immédiatement (visible dans l'historique)
 5. snapshot ← provider.FetchSnapshotAsync()            ← AUCUNE écriture catalogue pendant le fetch
    └─ erreur → run.Fail(ProviderError | InvalidSnapshot) ; log CatalogSyncFailed ; Manual → 502 provider_unavailable
-6. catalogStore.ApplyAsync(products ⇒
-       plan ← SyncPlanner.Plan(products, snapshot)                 (pur)
-       si !force et DiscontinuationGuard.IsTriggered(plan) → erreur sync_guard_triggered (→ rollback)
-       plan.ApplyTo(products, now) ; nouveaux produits ajoutés
-   )  → une transaction : SaveChanges + COMMIT, ou ROLLBACK complet
-   └─ garde-fou → run.Fail(GuardTriggered, activeBefore, wouldDiscontinue) ; log CatalogSyncGuardTriggered ; Manual → 422
+6. catalogStore.ApplyAsync(run.Id, products ⇒ …), en UNE transaction :
+       a. barrière : SELECT Status FROM SyncRuns WITH (UPDLOCK) WHERE Id = run.Id ; si ≠ Running → abandon (run repris)
+       b. plan ← SyncPlanner.Plan(products, snapshot)                 (pur)
+          si !force et DiscontinuationGuard.IsTriggered(plan) → erreur sync_guard_triggered (→ rollback)
+       c. plan.ApplyTo(products, now) ; nouveaux produits ajoutés ; SaveChanges
+       d. UPDATE SyncRuns SET Status = Succeeded, compteurs… WHERE Id = run.Id ; COMMIT (ou ROLLBACK complet)
+   └─ garde-fou → run bloqué (GuardTriggered, activeBefore, wouldDiscontinue) ; log CatalogSyncGuardTriggered ; Manual → 422
+   └─ barrière franchie par une autre instance, ou verrou perdu → run Interrupted ; log CatalogSyncLockLost ; Manual → 503
    └─ exception base → run.Fail(DatabaseError) ; log CatalogSyncFailed ; Manual → 503
-7. run.Succeed(counts) ; log CatalogSyncSucceeded
+7. log CatalogSyncSucceeded (le run est déjà validé « réussi » avec le catalogue)
 8. libération du verrou (dispose), y compris en cas d'exception
 ```
 
 **Points de conception**
 - **Tout-ou-rien (CAT-R8)** : le fetch complet précède toute écriture, et l'application se fait en une seule transaction. Une coupure à n'importe quel moment laisse le catalogue dans l'état du dernier commit. Le run peut rester `Running` en cas d'arrêt brutal : il est corrigé à l'étape 3 du run suivant.
-- **Enregistrement du run séparé de la transaction catalogue** : sinon un échec effacerait aussi la trace de l'échec.
-- **Perte du verrou** : si la connexion du verrou tombe pendant le run (`HandleLostToken`), le jeton d'annulation de l'étape 6 est déclenché, puis rollback, `Failed/Interrupted` et log `CatalogSyncLockLost`. Cela empêche deux instances d'appliquer en même temps.
+- **Issue du run** : la réussite est écrite dans la transaction du catalogue (impossible d'avoir un catalogue modifié avec un run « en cours »). Les échecs sont écrits à part (sinon le rollback effacerait la trace de l'échec), par une mise à jour **conditionnelle** (`WHERE Status = Running`) qui ne réécrit jamais un run terminé.
+- **Perte du verrou et barrière (fencing)** : si la connexion du verrou tombe, SQL Server libère aussitôt le verrou, mais l'instance ne le détecte qu'au keepalive suivant (`HandleLostToken`). Une autre instance peut alors prendre le verrou et déclarer le run interrompu (étape 3). La barrière 6a l'empêche d'appliquer en parallèle : ou bien le run a déjà été déclaré interrompu et l'application est abandonnée, ou bien la ligne du run reste verrouillée jusqu'au commit, et l'interruption (mise à jour ensembliste conditionnelle) attend puis voit un run réussi. *Ajouté après la revue du bloc 3.*
 - **Verrou** : `SqlDistributedLock("catalog-sync", connectionString)` utilise `sp_getapplock` en portée **session** sur une connexion dédiée. Si le processus meurt, SQL Server libère le verrou à la fermeture de la connexion (CAT-R10.4).
 - **Annulation du déclenchement manuel** : le run ne suit pas `HttpContext.RequestAborted`. Un client qui se déconnecte n'interrompt pas la synchro. Seul l'arrêt de l'hôte l'annule (le rollback reste propre).
 

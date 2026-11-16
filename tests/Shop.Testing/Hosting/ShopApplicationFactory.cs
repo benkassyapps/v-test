@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
+using Shop.Application.Catalog;
 using Shop.Infrastructure.Persistence;
 
 namespace Shop.Testing.Hosting;
@@ -31,8 +32,20 @@ public sealed class ShopApplicationFactory(string instanceId, string connectionS
             ["Instance:Id"] = InstanceId,
             ["Api:EnableDocs"] = "true",
             ["Admin:ApiKey"] = AdminApiKey,
+
+            // Planificateur piloté explicitement par les tests (CatalogSyncScheduler.CheckAsync).
             ["CatalogSync:SchedulerEnabled"] = "false",
             ["CatalogSync:BaseUrl"] = ProviderBaseUrl,
+
+            // Pipeline de résilience HTTP : une seule nouvelle tentative, sans délai (l'horloge des tests est simulée).
+            ["CatalogSync:Http:Retry:MaxRetryAttempts"] = "1",
+            ["CatalogSync:Http:Retry:Delay"] = "00:00:00",
+            ["CatalogSync:Http:Retry:UseJitter"] = "false",
+            ["CatalogSync:Http:CircuitBreaker:MinimumThroughput"] = "100000",
+
+            // Rejeu des opérations idempotentes : délais courts.
+            ["Database:RetryDelay"] = "00:00:00.010",
+            ["Database:MaxRetryDelay"] = "00:00:00.020",
         }));
 
         builder.ConfigureLogging(logging => logging.AddProvider(new FakeLoggerProvider(doubles.Logs)));
@@ -41,6 +54,11 @@ public sealed class ShopApplicationFactory(string instanceId, string connectionS
         {
             services.AddSingleton<TimeProvider>(doubles.Clock);
             services.ConfigureDbContext<ShopDbContext>(options => options.AddInterceptors(doubles.Faults));
+
+            // Le client typé du fournisseur porte le nom de son interface.
+            services.AddHttpClient(nameof(ICatalogProvider))
+                .ConfigurePrimaryHttpMessageHandler(() => doubles.Provider)
+                .SetHandlerLifetime(Timeout.InfiniteTimeSpan);
         });
     }
 }

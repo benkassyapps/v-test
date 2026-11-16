@@ -1,11 +1,13 @@
 using Shop.Api.Hosting;
+using Shop.Application;
 using Shop.Infrastructure;
 using Shop.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddShopApi(builder.Configuration);
-builder.Services.AddInfrastructure();
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
