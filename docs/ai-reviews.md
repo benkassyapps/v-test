@@ -148,3 +148,9 @@ Revue sur le diff de la clé d'idempotence (CART-R18) : transaction de commande,
 | 10 | Étapes de test qui lisaient le panier en ignorant le résultat (`_ = await …OrNull`) pour un effet de bord (utilisateur courant). | **Corrigé** | Méthode explicite `FocusOnAsync`. |
 
 **Résultat après corrections** : build sans avertissement ; 181 tests unitaires, 32 tests d'intégration et 118 scénarios d'acceptation verts.
+
+## Bloc 7 et simplifications — `/security-review` — 2026-11-17
+
+Revue de toute la branche, centrée sur la nouvelle surface : clé d'idempotence (en-tête, réponse enregistrée puis rejouée, purge) et liste des produits renvoyant directement la vue de lecture.
+
+**Aucune vulnérabilité de gravité haute ou moyenne.** Clé propre à chaque utilisateur (clé primaire `(UserId, Key)`, collation binaire, utilisateur toujours issu de l'identification), clé validée avant usage (expression régulière ancrée, longueur alignée sur la colonne), clé réutilisée pour une autre requête refusée sans divulguer la réponse enregistrée, SQL brut toujours paramétré, désérialisation `System.Text.Json` vers un type fermé (aucun polymorphisme), 503 sans détail interne.
