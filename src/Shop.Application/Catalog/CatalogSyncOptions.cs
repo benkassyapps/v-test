@@ -11,6 +11,13 @@ public sealed class CatalogSyncOptions
     /// <summary>Nombre de produits demandés par page au fournisseur.</summary>
     public int PageSize { get; set; } = 100;
 
+    /// <summary>
+    /// Délai maximal pour obtenir UNE page complète, lecture du corps comprise. Les délais du pipeline de résilience
+    /// s'arrêtent à la réception des en-têtes : sans ce délai, un corps qui cesse d'arriver bloquerait la
+    /// synchronisation indéfiniment, verrou détenu.
+    /// </summary>
+    public TimeSpan PageTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
     /// <summary>Créneau quotidien (expression cron à 5 champs, en UTC).</summary>
     public string Cron { get; set; } = "0 2 * * *";
 

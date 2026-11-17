@@ -27,6 +27,7 @@
 | 409 | `sync_already_running` | Synchronisation déjà en cours. |
 | 422 | `product_unavailable` / `quantity_limit_exceeded` | Règle métier non respectée. |
 | 422 | `sync_guard_triggered` | Synchronisation manuelle bloquée par le garde-fou de retrait massif (CAT-R11) ; peut être forcée. |
+| 422 | `idempotency_key_reused` | Clé d'idempotence déjà utilisée pour une requête différente (CART-R18). |
 | 500 | `internal_error` | Erreur inattendue, sans détail interne. |
 | 502 | `provider_unavailable` | Synchronisation manuelle en échec à cause du fournisseur. |
 | 503 | `service_unavailable` | Base de données temporairement indisponible. |

@@ -4,7 +4,7 @@ Ce fichier guide tout agent IA (Claude Code, Copilot, Codex…) qui travaille su
 
 ## Le projet en bref
 Service .NET 10 : catalogue de produits synchronisé chaque jour depuis DummyJSON et panier personnel par utilisateur.
-SQL Server, **plusieurs instances en parallèle**. Le sujet est dans `EXERCICE_CANDIDAT.md`.
+SQL Server, **plusieurs instances en parallèle**. Le sujet est dans `docs/EXERCICE_CANDIDAT.md`.
 
 ## Démarche : spec-driven development (obligatoire)
 1. **La spec est la source de vérité** : `specs/constitution.md` (principes non négociables), puis, par fonctionnalité, `requirements.md` → `acceptance/*.feature` → `design.md` → `tasks.md`.
@@ -20,7 +20,7 @@ SQL Server, **plusieurs instances en parallèle**. Le sujet est dans `EXERCICE_C
 - Fin de chaque bloc : `/code-review high` sur le diff du bloc.
 - Fin du bloc 4 et avant livraison : `/security-review`.
 - Chaque constat est **corrigé**, **rejeté avec justification** ou **reporté** (ajouté à un `tasks.md`), puis consigné dans `docs/ai-reviews.md`. Aucune correction appliquée sans être comprise.
-- Les propositions de l'IA modifiées ou rejetées par le candidat sont consignées dans `AI_USAGE.md` (journal).
+- Les propositions de l'IA modifiées ou rejetées par le candidat sont consignées dans `docs/ai-journal.md` ; les plus significatives sont reprises dans le bilan `docs/AI_USAGE.md`.
 
 ## Conventions
 - **Langue** : seul le code source est en anglais (types, membres, variables, routes, tables et colonnes, valeurs `code` des erreurs). **Tout le reste est en français** : commentaires, messages d'API (`title`, `detail`, validation), logs, noms lisibles des tests, documentation.
@@ -36,6 +36,38 @@ SQL Server, **plusieurs instances en parallèle**. Le sujet est dans `EXERCICE_C
 4. Les commandes de panier **ne sont pas rejouées automatiquement** (risque de double application si l'accusé de commit est perdu).
 5. Synchro : verrou distribué `catalog-sync`, instantané complet **avant** toute écriture, application en **une seule transaction**.
 6. Aucune règle métier ne repose sur la mémoire d'un processus : les instances sont sans état.
+
+## Pièges connus
+Erreurs réellement rencontrées sur ce projet (détails dans `docs/ai-reviews.md` et `docs/verification-manuelle.md`). Chacune a coûté du temps : ne pas les réintroduire.
+
+**Base de données et concurrence**
+- **`HOLDLOCK` sur une clé absente** verrouille aussi la clé suivante de l'index, c'est-à-dire le panier d'un autre utilisateur. Création de panier : index unique + reprise de la commande.
+- **RCSI** : une lecture sans verrou voit l'instantané de *son* instruction. Verrouiller et charger dans la même instruction peut donc lire un état périmé : verrou d'abord, chargement ensuite.
+- **Rejeu automatique d'une commande** (`TransientRetry`, Polly, `proxy_next_upstream` de nginx) : si l'accusé de commit est perdu, la commande est appliquée deux fois. Rejeu réservé aux opérations idempotentes ; côté client, c'est la clé d'idempotence (CART-R18), enregistrée **dans la même transaction** que la commande.
+- **Verrou `sp_getapplock` perdu sans que l'instance le sache** (connexion coupée) : une seconde synchro peut démarrer. Toujours écrire sous la barrière de la ligne `SyncRuns` (`WHERE Status = Running`, dans la transaction d'application).
+- **Suppression en masse** (purge) en une seule instruction : escalade en verrou de table qui bloque les commandes. Supprimer par lots (`DELETE TOP (n)`, n < 5 000).
+- **Une reprise sur violation d'unicité ne suffit pas** quand deux contraintes peuvent entrer en collision successivement (panier, puis clé d'idempotence) : compter les reprises nécessaires.
+
+**HTTP, fournisseur, proxy**
+- **Le `Timeout` de `HttpClient` ne protège pas d'un corps de réponse figé** : la synchro restait bloquée indéfiniment. Délai par page (`CatalogSync:PageTimeout`) qui couvre la lecture du corps.
+- **nginx dans Docker** : le résolveur musl ne renvoie qu'une adresse (→ `resolver 127.0.0.11` + variable pour une résolution dynamique) ; le relais est en HTTP/1.0 par défaut (→ `proxy_http_version 1.1`, sinon un `POST` sans corps est refusé) ; `proxy_next_upstream off` sur `/api/cart`.
+- **`AddStandardResilienceHandler(section)`** lève une exception si la section est vide : utiliser la surcharge avec action (`options => section.Bind(options)`).
+- **Validation par expression régulière** : `$` accepte un `\n` final. Toujours ancrer avec `\A…\z`.
+- **JSON du curseur** : fixer les noms avec `JsonPropertyName`. Sans eux, la casse produite à la sérialisation ne correspondait pas au format documenté, et la désérialisation, sensible à la casse, refusait un curseur valide.
+
+**Plateforme .NET**
+- **`InvariantGlobalization`** est incompatible avec `Microsoft.Data.SqlClient` : ne pas l'activer.
+- **`WebApplicationFactory`** : la configuration de test n'est appliquée qu'à la construction de l'hôte. Un service qui lit la configuration à l'enregistrement (`InstanceIdentity`) doit être une fabrique différée.
+
+**Tests**
+- **`FakeTimeProvider` ne recule pas** : les scénarios fixent des instants arbitraires, d'où `TestClock` (minuteries en temps réel).
+- **Doubles de test globaux** (intercepteurs EF) partagés par les 2 instances et par les services d'arrière-plan : un commit de la synchro peut consommer une panne armée pour le panier. Filtrer sur le contexte concerné.
+- **Nouveau `.feature`** : il doit être ajouté au `.csproj` de `Shop.AcceptanceTests`, sinon il n'est pas exécuté (`TraceabilityTests` le détecte). Le code généré par Reqnroll va dans `obj/` (`ReqnrollUseIntermediateOutputPathForCodeBehind`), jamais dans `specs/`.
+- **Tests par mutation** : une mutation qui rend une condition constante est refusée par le compilateur (`TreatWarningsAsErrors`) ; muter avec une condition non triviale.
+
+**Outillage (Windows)**
+- Pas de Python sur le poste. `sed`/`perl` sur des `.csproj` ou des modifications multilignes ont déjà corrompu des fichiers (échappement) : utiliser l'éditeur, puis relire le diff.
+- Docker Desktop doit être démarré et à jour pour `dotnet test` (Testcontainers).
 
 ## Commandes
 ```bash

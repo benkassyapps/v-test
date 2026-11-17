@@ -16,6 +16,7 @@ public static class ErrorCodes
     public const string SyncAlreadyRunning = "sync_already_running";
     public const string ProductUnavailable = "product_unavailable";
     public const string QuantityLimitExceeded = "quantity_limit_exceeded";
+    public const string IdempotencyKeyReused = "idempotency_key_reused";
     public const string SyncGuardTriggered = "sync_guard_triggered";
     public const string ProviderUnavailable = "provider_unavailable";
     public const string ServiceUnavailable = "service_unavailable";

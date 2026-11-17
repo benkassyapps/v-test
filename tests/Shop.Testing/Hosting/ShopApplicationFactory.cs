@@ -36,6 +36,7 @@ public sealed class ShopApplicationFactory(string instanceId, string connectionS
             // Planificateur piloté explicitement par les tests (CatalogSyncScheduler.CheckAsync).
             ["CatalogSync:SchedulerEnabled"] = "false",
             ["CatalogSync:BaseUrl"] = ProviderBaseUrl,
+            ["CatalogSync:PageTimeout"] = "00:00:05",
 
             // Pipeline de résilience HTTP : une seule nouvelle tentative, sans délai (l'horloge des tests est simulée).
             ["CatalogSync:Http:Retry:MaxRetryAttempts"] = "1",
@@ -53,7 +54,7 @@ public sealed class ShopApplicationFactory(string instanceId, string connectionS
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<TimeProvider>(doubles.Clock);
-            services.ConfigureDbContext<ShopDbContext>(options => options.AddInterceptors(doubles.Faults));
+            services.ConfigureDbContext<ShopDbContext>(options => options.AddInterceptors(doubles.Faults, doubles.LostCommits));
 
             // Le client typé du fournisseur porte le nom de son interface.
             services.AddHttpClient(nameof(ICatalogProvider))

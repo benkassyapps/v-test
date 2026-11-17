@@ -99,3 +99,52 @@ Revue de sécurité de toute la branche (commits des blocs 1 à 3 et changements
 **Aucune vulnérabilité de gravité haute ou moyenne.** SQL brut toujours paramétré (`SqlQuery(FormattableString)`), paniers isolés par construction (aucun identifiant de panier dans les routes, lignes cherchées dans le panier de l'utilisateur courant), clé d'administration comparée en temps constant, erreurs génériques sans détail interne.
 
 **Limites assumées à documenter dans DECISIONS.md** : `X-User-Id` n'est pas une authentification (usurpation possible, assumée par le sujet ; remplacement par JWT sans toucher aux endpoints) ; clé d'administration statique et partagée (évolution : rôle porté par un fournisseur d'identité).
+
+## Bloc 5 — Exécution locale — `/code-review high` — 2026-11-16
+
+Revue sur le diff indexé (Dockerfile, docker-compose, nginx, `.env.example`, `.http`). 8 constats.
+
+| # | Constat | Décision | Justification / correction |
+|---|---|---|---|
+| 1 | **nginx rejoue PUT et DELETE** sur l'autre instance après une erreur ou un délai : une commande de panier déjà validée reçoit un 409/404 trompeur (contraire à l'invariant n° 4). | **Corrigé** | `proxy_next_upstream off` pour `/api/cart` ; comportement par défaut conservé ailleurs (le POST de synchronisation n'est jamais rejoué). |
+| 2 | SQL Server publié sur toutes les interfaces avec `sa` et le mot de passe d'exemple : accessible depuis le réseau local. | **Corrigé** | Port lié à `127.0.0.1`. |
+| 3 | Un `docker compose up` sur une pile en marche relance le migrateur pendant que les anciennes instances tournent. | **Documenté** | Procédure explicite dans `docker-compose.yml` (arrêter les instances avant une nouvelle migration) ; en production, la migration est une étape du pipeline de déploiement. Migrations « expand/contract » en évolution. |
+| 4 | Clé d'administration du `.http` figée sur la valeur d'exemple. | **Corrigé en partie** | Avertissement explicite en tête du fichier (doit égaler `ADMIN_API_KEY` du `.env`). |
+| 5 | Pas de contrôle de santé ni de politique de redémarrage pour `api`. | **Corrigé en partie** | `restart: unless-stopped` ajouté. Contrôle de santé non ajouté : l'image d'exécution ne contient aucun client HTTP (en ajouter un élargit la surface d'attaque) ; en production, l'orchestrateur sonde `/health`. |
+| 6 | Mot de passe `sa` passé en argument de `sqlcmd` (visible dans la liste des processus du conteneur). | **Corrigé** | Variable `SQLCMDPASSWORD`. |
+| 7 | Image construite deux fois (migrateur et instances). | **Corrigé** | Seul le migrateur construit ; `api` réutilise l'image (`pull_policy: never`). |
+| 8 | En-têtes `X-Forwarded-*` envoyés mais jamais exploités par l'API. | **Corrigé** | En-têtes retirés (aucun besoin de l'adresse du client dans cette version). |
+
+**Trouvés pendant la vérification manuelle (hors revue)**, détails dans [verification-manuelle.md](verification-manuelle.md) :
+- répartition inopérante (résolution DNS musl à une seule adresse) → résolution dynamique nginx ;
+- `POST` sans corps refusé (nginx en HTTP/1.0) → `proxy_http_version 1.1` ;
+- **synchronisation bloquée indéfiniment par un corps de réponse figé** → délai par page, prouvé par un test qui reste bloqué sans le correctif.
+
+**Résultat** : build sans avertissement ; 170 tests unitaires, 31 tests d'intégration et 108 scénarios d'acceptation verts ; pile docker compose vérifiée de bout en bout.
+
+## Livraison (blocs 1 à 6) — `/security-review` final — 2026-11-16
+
+Revue de toute la branche, y compris conteneurisation, nginx et documentation : secrets versionnés, exposition réseau, conteneur, configuration du proxy, administration, fournisseur, fuite d'information.
+
+**Aucune vulnérabilité de gravité haute ou moyenne.** Secrets uniquement via `.env` (non versionné, vérifié par test), SQL Server limité à `127.0.0.1`, instances joignables seulement via nginx, conteneur non root, mot de passe hors de la ligne de commande, commandes du panier jamais rejouées par le proxy.
+
+**Points d'attention non bloquants (documentés)** : valeurs d'exemple de `.env.example` réservées au poste local ; `TrustServerCertificate=true` acceptable sur le réseau Docker local mais pas en production ; documentation OpenAPI exposée dans compose pour la démonstration (désactivée par défaut hors Development).
+
+## Bloc 7 — Clé d'idempotence — `/code-review high` — 2026-11-16
+
+Revue sur le diff de la clé d'idempotence (CART-R18) : transaction de commande, rejeu, purge, en-têtes, tests. 10 constats.
+
+| # | Constat | Décision | Justification / correction |
+|---|---|---|---|
+| 1 | Purge des clés expirées en **une seule** suppression : sur un gros volume, escalade en verrou de table qui bloque les commandes du panier, et risque d'interblocage avec la suppression d'une clé expirée réutilisée. | **Corrigé** | Suppression par lots de 1 000 (`DELETE TOP`), transactions courtes ; un interblocage éventuel est absorbé (purge reprise au tick suivant). Test d'intégration sur plusieurs lots. |
+| 2 | Le message du 503 ne disait pas au client qu'il peut réessayer sans risque. | **Corrigé** | Le message indique que l'opération a pu être enregistrée et invite à renvoyer la même demande avec la même `Idempotency-Key`. |
+| 3 | Sans clé, la vue du panier était construite **avant** le commit : verrous conservés plus longtemps sans raison. | **Corrigé** | Vue construite après le commit quand aucune clé n'est fournie ; avant le commit seulement si elle doit être enregistrée avec la clé. |
+| 4 | Une seule reprise sur violation d'unicité : une collision sur la création du panier **puis** sur la clé fait échouer la commande en 500. | **Corrigé** | 3 tentatives (deux contraintes successives possibles), justifié en commentaire. |
+| 5 | La clé était vérifiée **après** le chargement du panier : chargement inutile pour un rejeu, et création implicite préparée pour rien. | **Corrigé** | Verrou du panier, puis vérification de la clé, puis seulement chargement ou création (méthodes `LockAsync` / `LoadOrCreateAsync`). |
+| 6 | L'intercepteur « accusé de commit perdu » était global : un commit concurrent (synchronisation, planificateur) pouvait consommer l'armement et rendre le test aléatoire. | **Corrigé** | Il ne se déclenche que pour un contexte qui suit un panier ou une clé d'idempotence. |
+| 7 | Noms d'en-têtes codés en dur dans les tests. | **Corrigé** | Constantes `IdempotencyKeyFormat.HeaderName` et `ReplayedHeaderName`. |
+| 8 | Conversion implicite inutilisée. | **Corrigé** | Retirée. |
+| 9 | Configuration EF de `IdempotencyKeys` rangée avec l'entité, et non avec les autres configurations. | **Corrigé** | Déplacée dans `Persistence/Configurations/Carts`. |
+| 10 | Étapes de test qui lisaient le panier en ignorant le résultat (`_ = await …OrNull`) pour un effet de bord (utilisateur courant). | **Corrigé** | Méthode explicite `FocusOnAsync`. |
+
+**Résultat après corrections** : build sans avertissement ; 181 tests unitaires, 32 tests d'intégration et 118 scénarios d'acceptation verts.

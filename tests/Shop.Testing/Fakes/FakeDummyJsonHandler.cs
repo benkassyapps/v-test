@@ -35,6 +35,9 @@ public sealed class FakeDummyJsonHandler : HttpMessageHandler
     /// <summary>Numéro de page (à partir de 1) à partir duquel le fournisseur répond 503.</summary>
     public int? FailFromPage { get; set; }
 
+    /// <summary>Numéro de page (à partir de 1) à partir duquel le fournisseur envoie les en-têtes 200 puis plus rien (corps figé).</summary>
+    public int? StallBodyFromPage { get; set; }
+
     /// <summary>Le fournisseur répond 503 à toutes les requêtes.</summary>
     public bool Unavailable { get; set; }
 
@@ -127,6 +130,7 @@ public sealed class FakeDummyJsonHandler : HttpMessageHandler
         FailFromPage = null;
         Unavailable = false;
         AnnouncedTotalOverride = null;
+        StallBodyFromPage = null;
         Interlocked.Exchange(ref _requestCount, 0);
     }
 
@@ -176,6 +180,14 @@ public sealed class FakeDummyJsonHandler : HttpMessageHandler
             return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
         }
 
+        if (StallBodyFromPage is { } stallFrom && pageNumber >= stallFrom)
+        {
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(new StallingStream()) { Headers = { ContentType = new("application/json") } },
+            };
+        }
+
         var page = all.Skip(skip).Take(effectiveLimit).Select(product => new
         {
             id = product.Id,
@@ -198,4 +210,39 @@ public sealed class FakeDummyJsonHandler : HttpMessageHandler
     }
 
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
+/// <summary>Corps de réponse qui n'arrive jamais : chaque lecture attend jusqu'à l'annulation (connexion figée).</summary>
+internal sealed class StallingStream : Stream
+{
+    public override bool CanRead => true;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => false;
+
+    public override long Length => throw new NotSupportedException();
+
+    public override long Position { get => 0; set => throw new NotSupportedException(); }
+
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        await Task.Delay(Timeout.Infinite, cancellationToken);
+        return 0;
+    }
+
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+        ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException("Lecture synchrone non prise en charge.");
+
+    public override void Flush()
+    {
+    }
+
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+    public override void SetLength(long value) => throw new NotSupportedException();
+
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 }

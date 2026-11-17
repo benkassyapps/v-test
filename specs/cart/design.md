@@ -130,9 +130,31 @@ Validation explicite dans les endpoints (`quantity` obligatoire entre 1 et 999, 
 | **Suppression ∥ modification de A** | Celui qui obtient le verrou en premier gagne. Si c'est la suppression, la modification ne trouve plus la ligne (404). Si c'est la modification, A passe en v2 et la suppression en v1 reçoit un 409. | 1 succès ; la ligne ne réapparaît jamais (CART-R10) |
 | **Ajout ∥ synchro qui retire le produit** | L'ajout tient un verrou S sur le produit jusqu'au commit ; la synchro attend (ou l'ajout attend la synchro, puis voit le produit retiré). | Jamais d'ajout d'un produit déjà retiré (CART-R3) |
 
-## 7. Limites assumées et évolutions
+## 7. Clé d'idempotence (CART-R18)
+
+**Problème** : une commande validée dont la réponse est perdue (coupure, `503`, délai dépassé) serait réappliquée si le client réessaie, avec par exemple une quantité doublée. Les commandes ne sont pas rejouées par le serveur (§3) ; la clé d'idempotence permet au **client** de réessayer sans risque.
+
+**Table** `IdempotencyKeys(UserId, Key, RequestHash, Outcome, CreatedAt, ExpiresAt)`, clé primaire `(UserId, Key)` (collation binaire comme `Carts.UserId`). `RequestHash` est le SHA-256 du contenu canonique de la commande (`add|productId|quantity`, `change|lineId|quantity|expectedVersion`, `remove|lineId|expectedVersion`). `Outcome` est la réponse sérialisée : le panier rendu ou l'erreur métier.
+
+**Dans la transaction de commande** (§3), entre le verrou du panier et la commande :
+```
+2bis. SELECT IdempotencyKeys WHERE (UserId, Key)        ← après le verrou : lecture de l'état validé
+      ├─ présente et non expirée, même empreinte → réponse d'origine rejouée (rien n'est modifié)
+      ├─ présente et non expirée, autre empreinte → 422 idempotency_key_reused
+      ├─ présente mais expirée → supprimée, puis traitement normal
+      └─ absente → commande exécutée, puis INSERT de la clé avec la réponse produite
+   COMMIT : panier et clé validés ENSEMBLE
+```
+- **Commit validé mais accusé perdu** : la nouvelle tentative trouve la clé et rejoue la réponse d'origine, sans double application.
+- **Envois simultanés de la même clé** : le verrou du panier les sérialise ; le second trouve la clé. Sans panier (premier ajout), la collision sur la création fait reprendre la commande perdante, qui trouve alors la clé. La clé primaire sert de filet de sécurité : une collision fait aussi reprendre la commande.
+- **Refus métier enregistrés** (`404`, `409`, `422`) : la clé est enregistrée **seule**, sans les modifications annulées du panier (y compris une création implicite). Erreurs techniques (`5xx`) jamais enregistrées.
+- **Expiration** : 24 h (`Cart:IdempotencyKeyTtl`) ; purge périodique des clés expirées par un service d'arrière-plan (suppression par lots, sans risque en multi-instance).
+- **API** : en-tête facultatif `Idempotency-Key` ; en-tête de réponse `Idempotent-Replayed: true` lors d'un rejeu.
+
+## 8. Limites assumées et évolutions
 - **Écritures sérialisées par panier** : c'est voulu, avec une contention négligeable pour un panier personnel. Les paniers différents ne se bloquent pas. Les lectures ne sont jamais bloquées.
 - **Reprise après collision de création** : lors de premiers ajouts simultanés, la commande perdante est exécutée deux fois (la première annulée). C'est sûr, puisque rien n'a été validé, et rare (seulement la toute première écriture d'un utilisateur).
-- **Commandes non rejouées automatiquement** : une erreur transitoire renvoie `503`. Les clés d'idempotence (`Idempotency-Key` sur `POST /api/cart/lines`) permettraient un rejeu sûr.
+- **Commandes non rejouées par le serveur** : une erreur transitoire renvoie `503` ; le client peut réessayer sans risque **s'il fournit une clé d'idempotence** (§7). Sans clé, une nouvelle tentative après un commit dont l'accusé est perdu réapplique la commande.
+- **Rejeu d'un instantané** : la réponse rejouée est celle d'origine, pas l'état actuel du panier.
 - **Prix sans devise** et sans remise ; le total est recalculé à chaque lecture (pas de colonne dénormalisée).
 - Paniers abandonnés jamais purgés : une purge par ancienneté (`UpdatedAt`) est une évolution.

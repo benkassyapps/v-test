@@ -49,7 +49,7 @@ public sealed class ConcurrencySteps(CartWorld carts)
         var productId = await carts.ProductIdAsync(product);
         await carts.RunConcurrentlyAsync([.. Enumerable.Range(0, times).Select(index => new PendingCartRequest(
             index % 2 == 0 ? first : second, user, HttpMethod.Post, "/api/cart/lines", new { productId, quantity }, quantity))]);
-        _ = await carts.ReadCartAsyncOrNull(user);
+        await carts.FocusOnAsync(user);
     }
 
     [When("{string} envoie simultanément l'ajout de {int} {string} via l'instance {int} et l'ajout de {int} {string} via l'instance {int}")]
@@ -62,7 +62,7 @@ public sealed class ConcurrencySteps(CartWorld carts)
             new PendingCartRequest(firstInstance, user, HttpMethod.Post, "/api/cart/lines", new { productId = firstId, quantity = firstQuantity }, firstQuantity),
             new PendingCartRequest(secondInstance, user, HttpMethod.Post, "/api/cart/lines", new { productId = secondId, quantity = secondQuantity }, secondQuantity),
         ]);
-        _ = await carts.ReadCartAsyncOrNull(user);
+        await carts.FocusOnAsync(user);
     }
 
     // --- Vérifications ---

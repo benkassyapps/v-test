@@ -1,0 +1,96 @@
+# Appels de l'API (extension REST Client de VS Code, ou client HTTP de Visual Studio / Rider).
+# Par défaut : la pile docker compose (nginx répartit entre les 2 instances ; l'en-tête X-Instance indique laquelle répond).
+# IMPORTANT : @adminKey doit être identique à ADMIN_API_KEY du fichier .env (valeur de .env.example par défaut) ;
+# sinon les appels d'administration répondent 403 admin_key_invalid.
+
+@baseUrl = http://localhost:8080
+@adminKey = exemple-cle-admin-locale
+@user = alice
+
+### Santé du service (vérifie l'accès à la base)
+GET {{baseUrl}}/health
+
+### ───────────── Catalogue ─────────────
+
+### Première page de produits actifs (pagination par curseur)
+GET {{baseUrl}}/api/products?limit=5
+
+### Page suivante : remplacer la valeur par le nextCursor de la réponse précédente
+GET {{baseUrl}}/api/products?limit=5&cursor=eyJ2IjoxLCJpZCI6NX0
+
+### ───────────── Administration de la synchronisation ─────────────
+
+### Synchronisation manuelle (même traitement que la synchronisation quotidienne)
+POST {{baseUrl}}/api/admin/catalog/sync
+X-Admin-Key: {{adminKey}}
+
+### Synchronisation forcée : lève le garde-fou de retrait massif (à n'utiliser qu'après vérification du fournisseur)
+POST {{baseUrl}}/api/admin/catalog/sync?force=true
+X-Admin-Key: {{adminKey}}
+
+### Historique des synchronisations (du plus récent au plus ancien)
+GET {{baseUrl}}/api/admin/catalog/sync-runs?limit=10
+X-Admin-Key: {{adminKey}}
+
+### État de la synchronisation et action conseillée
+GET {{baseUrl}}/api/admin/catalog/sync-status
+X-Admin-Key: {{adminKey}}
+
+### Sans clé d'administration → 403 admin_key_invalid
+POST {{baseUrl}}/api/admin/catalog/sync
+
+### ───────────── Panier (utilisateur identifié par X-User-Id) ─────────────
+
+### Créer ou récupérer son panier (201 si créé, 200 s'il existait)
+PUT {{baseUrl}}/api/cart
+X-User-Id: {{user}}
+
+### Consulter son panier (lignes, prix conservés, total, versions)
+GET {{baseUrl}}/api/cart
+X-User-Id: {{user}}
+
+### Ajouter un article (crée le panier si besoin ; réajouter cumule la quantité)
+POST {{baseUrl}}/api/cart/lines
+X-User-Id: {{user}}
+Idempotency-Key: {{$guid}}
+Content-Type: application/json
+
+{ "productId": 1, "quantity": 2 }
+
+### Rejeu : renvoyer EXACTEMENT la même demande avec la même clé → réponse d'origine (Idempotent-Replayed: true), rien n'est réappliqué
+POST {{baseUrl}}/api/cart/lines
+X-User-Id: {{user}}
+Idempotency-Key: ajout-mascara-1
+Content-Type: application/json
+
+{ "productId": 1, "quantity": 2 }
+
+### Remplacer la quantité d'une ligne : lineId et expectedVersion viennent de la dernière consultation
+PUT {{baseUrl}}/api/cart/lines/00000000-0000-0000-0000-000000000000
+X-User-Id: {{user}}
+Content-Type: application/json
+
+{ "quantity": 5, "expectedVersion": 1 }
+
+### Supprimer une ligne (version consultée en paramètre)
+DELETE {{baseUrl}}/api/cart/lines/00000000-0000-0000-0000-000000000000?expectedVersion=1
+X-User-Id: {{user}}
+
+### ───────────── Erreurs ─────────────
+
+### Sans X-User-Id → 401 user_not_identified
+GET {{baseUrl}}/api/cart
+
+### Quantité hors bornes → 400 validation_failed (détail par champ)
+POST {{baseUrl}}/api/cart/lines
+X-User-Id: {{user}}
+Content-Type: application/json
+
+{ "productId": 1, "quantity": 1000 }
+
+### Produit inexistant → 422 product_unavailable
+POST {{baseUrl}}/api/cart/lines
+X-User-Id: {{user}}
+Content-Type: application/json
+
+{ "productId": 999999, "quantity": 1 }

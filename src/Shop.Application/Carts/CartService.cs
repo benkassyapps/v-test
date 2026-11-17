@@ -4,9 +4,10 @@ using Shop.Domain.Common;
 namespace Shop.Application.Carts;
 
 /// <summary>
-/// Cas d'usage du panier personnel (CART-R13 à CART-R17). L'utilisateur est toujours passé explicitement : aucune
+/// Cas d'usage du panier personnel (CART-R13 à CART-R18). L'utilisateur est toujours passé explicitement : aucune
 /// opération n'accepte d'identifiant de panier, chacune vise le panier de l'utilisateur courant (CART-R2).
-/// Les règles métier vivent dans l'agrégat <see cref="Cart"/> ; la concurrence est gérée par <see cref="ICartStore"/>.
+/// Les règles métier vivent dans l'agrégat <see cref="Cart"/> ; la concurrence et l'idempotence sont gérées par
+/// <see cref="ICartStore"/>.
 /// </summary>
 public sealed class CartService(ICartStore store, ICartReader reader, TimeProvider clock)
 {
@@ -19,17 +20,18 @@ public sealed class CartService(ICartStore store, ICartReader reader, TimeProvid
         await reader.FindAsync(userId, cancellationToken) is { } cart ? cart : CartErrors.CartNotFound();
 
     /// <summary>Ajoute un produit ou cumule sa quantité ; crée le panier implicitement si besoin (CART-R15).</summary>
-    public Task<Result<CartView>> AddItemAsync(string userId, int productId, int quantity, CancellationToken cancellationToken) =>
+    public Task<CartCommandResponse> AddItemAsync(
+        string userId, int productId, int quantity, string? idempotencyKey, CancellationToken cancellationToken) =>
         store.ExecuteAsync(userId, createIfMissing: true, async (cart, products, token) =>
         {
             var product = await products.FindAsync(productId, token);
             var now = clock.GetUtcNow();
             return cart.AddItem(productId, product, quantity, Guid.CreateVersion7(now), now);
-        }, cancellationToken);
+        }, Idempotency(idempotencyKey, CartRequestFingerprint.Add(productId, quantity)), cancellationToken);
 
     /// <summary>Remplace la quantité d'une ligne, à partir de la version consultée (CART-R8, CART-R16).</summary>
-    public Task<Result<CartView>> ChangeQuantityAsync(
-        string userId, Guid lineId, int quantity, long expectedVersion, CancellationToken cancellationToken) =>
+    public Task<CartCommandResponse> ChangeQuantityAsync(
+        string userId, Guid lineId, int quantity, long expectedVersion, string? idempotencyKey, CancellationToken cancellationToken) =>
         store.ExecuteAsync(userId, createIfMissing: false, async (cart, products, token) =>
         {
             // La disponibilité du produit n'importe que pour une AUGMENTATION acceptable (CART-R11.3) : on ne lit (et ne
@@ -38,10 +40,15 @@ public sealed class CartService(ICartStore store, ICartReader reader, TimeProvid
             var mayIncrease = line is not null && line.Version == expectedVersion && quantity > line.Quantity;
             var productActive = !mayIncrease || (await products.FindAsync(line!.ProductId, token))?.IsActive == true;
             return cart.ChangeQuantity(lineId, quantity, expectedVersion, productActive, clock.GetUtcNow());
-        }, cancellationToken);
+        }, Idempotency(idempotencyKey, CartRequestFingerprint.Change(lineId, quantity, expectedVersion)), cancellationToken);
 
     /// <summary>Supprime une ligne, à partir de la version consultée (CART-R8, CART-R17).</summary>
-    public Task<Result<CartView>> RemoveLineAsync(string userId, Guid lineId, long expectedVersion, CancellationToken cancellationToken) =>
+    public Task<CartCommandResponse> RemoveLineAsync(
+        string userId, Guid lineId, long expectedVersion, string? idempotencyKey, CancellationToken cancellationToken) =>
         store.ExecuteAsync(userId, createIfMissing: false, (cart, _, _) =>
-            Task.FromResult(cart.RemoveLine(lineId, expectedVersion, clock.GetUtcNow())), cancellationToken);
+            Task.FromResult(cart.RemoveLine(lineId, expectedVersion, clock.GetUtcNow())),
+            Idempotency(idempotencyKey, CartRequestFingerprint.Remove(lineId, expectedVersion)), cancellationToken);
+
+    private static IdempotencyRequest? Idempotency(string? key, string requestHash) =>
+        key is null ? null : new IdempotencyRequest(key, requestHash);
 }

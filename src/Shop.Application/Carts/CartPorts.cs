@@ -62,8 +62,15 @@ public interface ICartStore
     /// <paramref name="createIfMissing"/> (création implicite optimiste, CART-R15.2). Une commande rejetée annule tout,
     /// y compris la création implicite. Jamais rejouée sur erreur transitoire (seulement après une collision de création,
     /// lorsque rien n'a été validé). Renvoie le panier après la commande.
+    /// Avec une clé d'idempotence (CART-R18) : la clé et la réponse sont enregistrées dans la même transaction ; une
+    /// clé déjà utilisée rejoue la réponse d'origine (même requête) ou est refusée (requête différente).
     /// </summary>
-    Task<Result<CartView>> ExecuteAsync(string userId, bool createIfMissing, CartCommand command, CancellationToken cancellationToken);
+    Task<CartCommandResponse> ExecuteAsync(
+        string userId,
+        bool createIfMissing,
+        CartCommand command,
+        IdempotencyRequest? idempotency,
+        CancellationToken cancellationToken);
 
     /// <summary>Crée le panier s'il n'existe pas, sinon le renvoie tel quel (CART-R1, CART-R13). Idempotent.</summary>
     Task<(CartView Cart, bool Created)> GetOrCreateAsync(string userId, CancellationToken cancellationToken);

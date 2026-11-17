@@ -24,6 +24,7 @@ public static class ProblemMapping
         [ErrorCodes.SyncAlreadyRunning] = (StatusCodes.Status409Conflict, "Synchronisation déjà en cours"),
         [ErrorCodes.ProductUnavailable] = (StatusCodes.Status422UnprocessableEntity, "Produit indisponible"),
         [ErrorCodes.QuantityLimitExceeded] = (StatusCodes.Status422UnprocessableEntity, "Quantité maximale dépassée"),
+        [ErrorCodes.IdempotencyKeyReused] = (StatusCodes.Status422UnprocessableEntity, "Clé d'idempotence déjà utilisée"),
         [ErrorCodes.SyncGuardTriggered] = (StatusCodes.Status422UnprocessableEntity, "Synchronisation bloquée par le garde-fou"),
         [ErrorCodes.InternalError] = (StatusCodes.Status500InternalServerError, "Erreur interne"),
         [ErrorCodes.ProviderUnavailable] = (StatusCodes.Status502BadGateway, "Fournisseur indisponible"),

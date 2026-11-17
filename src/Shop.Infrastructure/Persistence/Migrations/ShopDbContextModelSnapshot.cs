@@ -216,6 +216,43 @@ namespace Shop.Infrastructure.Persistence.Migrations
                     b.ToTable("SyncRuns", "dbo");
                 });
 
+            modelBuilder.Entity("Shop.Infrastructure.Carts.IdempotencyRecord", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)")
+                        .IsFixedLength();
+
+                    b.HasKey("UserId", "Key");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("IX_IdempotencyKeys_ExpiresAt");
+
+                    b.ToTable("IdempotencyKeys", "dbo");
+                });
+
             modelBuilder.Entity("Shop.Domain.Carts.CartLine", b =>
                 {
                     b.HasOne("Shop.Domain.Carts.Cart", null)

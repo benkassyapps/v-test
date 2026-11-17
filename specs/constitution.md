@@ -1,7 +1,7 @@
 # Constitution du projet
 
 Principes **non négociables** qui s'appliquent à toute spécification, tout design et tout code du dépôt.
-Un écart à l'un de ces principes doit être explicitement justifié dans `DECISIONS.md` et validé avant d'être implémenté.
+Un écart à l'un de ces principes doit être explicitement justifié dans `docs/DECISIONS.md` et validé avant d'être implémenté.
 
 ## 1. Démarche : la spécification d'abord
 1. Aucun comportement n'est implémenté sans exigence identifiée (`CAT-R*`, `CART-R*`, `PLT-*`).
@@ -25,7 +25,7 @@ Un écart à l'un de ces principes doit être explicitement justifié dans `DECI
 1. Clean Architecture en 4 projets : `Shop.Domain` → `Shop.Application` → `Shop.Infrastructure` / `Shop.Api`. Les dépendances pointent vers le domaine.
 2. `Shop.Domain` n'a **aucune dépendance** (ni EF Core, ni ASP.NET). Les règles métier vivent dans les agrégats, pas dans les endpoints ni dans le SQL.
 3. Organisation par fonctionnalité (`Catalog/`, `Carts/`) à l'intérieur de chaque couche.
-4. Simplicité : pas de repository générique, pas de MediatR. Toute nouvelle dépendance est justifiée (avantage, coût, limite) dans `DECISIONS.md`.
+4. Simplicité : pas de repository générique, pas de MediatR. Toute nouvelle dépendance est justifiée (avantage, coût, limite) dans `docs/DECISIONS.md`.
 5. Le temps est injecté (`TimeProvider`) et toutes les dates sont en **UTC**.
 
 ## 5. Contrat HTTP

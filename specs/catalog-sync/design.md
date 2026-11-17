@@ -175,6 +175,7 @@ Règle de `actionRequired` (pure, testée unitairement) :
 |---|---|---|
 | `CatalogSync:BaseUrl` | `https://dummyjson.com` | Fournisseur. |
 | `CatalogSync:PageSize` | `100` | Taille des pages demandées. |
+| `CatalogSync:PageTimeout` | `00:00:30` | Délai pour obtenir une page COMPLÈTE, lecture du corps comprise (les délais du pipeline s'arrêtent aux en-têtes). Ajouté après la vérification manuelle. |
 | `CatalogSync:Cron` | `0 2 * * *` (UTC) | Créneau quotidien. |
 | `CatalogSync:SchedulerEnabled` | `true` | Planificateur actif sur l'instance. |
 | `CatalogSync:TickInterval` | `00:01:00` | Fréquence de vérification. |

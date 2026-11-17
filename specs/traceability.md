@@ -42,6 +42,7 @@
 | CART-R15 Ajouter (dont création implicite) | ajout.feature, concurrence.feature | Unitaires : agrégat | ✅ |
 | CART-R16 Modifier une quantité | modification-suppression.feature | Unitaires : agrégat | ✅ |
 | CART-R17 Supprimer | modification-suppression.feature | Unitaires : agrégat | ✅ |
+| CART-R18 Clé d'idempotence | idempotence.feature (confirmation perdue, rejeu, autre requête, refus rejoué, envois simultanés, par utilisateur, expiration, format) | Unitaires : empreinte et format de clé ; intégration : purge par lots | ✅ |
 
 ## Plateforme
 
@@ -50,7 +51,7 @@
 | PLT-1 Multi-instance | plateforme.feature (X-Instance), scénarios de concurrence à 2 instances | Intégration : `HostingTests` (2 instances, `X-Instance`) | ✅ |
 | PLT-2 Identification | plateforme.feature | Unitaires : format de `X-User-Id` | ✅ |
 | PLT-3 Contrat d'erreurs | plateforme.feature + codes vérifiés dans tous les scénarios | Unitaires : `ProblemMappingTests`, `ResultTests` ; Intégration : 404 au format ProblemDetails | ✅ |
-| PLT-4 Démarrage reproductible | — | **Vérification manuelle** (`docker compose up --build`, procédure du README). Exemptée dans `TraceabilityTests`. | ⏳ |
+| PLT-4 Démarrage reproductible | — | **Vérification manuelle** du 2026-11-16 ([docs/verification-manuelle.md](../docs/verification-manuelle.md)) : `docker compose up --build`, 2 instances derrière nginx, synchro réelle DummyJSON, scénario d'Alice, panne du fournisseur. Exemptée dans `TraceabilityTests`. | ✅ |
 | PLT-5 Migrations et RCSI | — | Intégration : `DatabaseTests` (migrations appliquées, RCSI actif) | ✅ |
 | PLT-6 Observabilité | plateforme.feature (santé) | Intégration : `/health` sur les 2 instances | ✅ |
 | PLT-7 OpenAPI | plateforme.feature | Intégration : document OpenAPI publié | ✅ |

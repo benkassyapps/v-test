@@ -38,6 +38,10 @@ public static class CartErrors
             "Cette ligne n'existe pas (ou plus) dans votre panier.",
             new Dictionary<string, object?> { ["lineId"] = lineId });
 
+    public static DomainError IdempotencyKeyReused() =>
+        new(ErrorCodes.IdempotencyKeyReused,
+            "Cette clé d'idempotence a déjà été utilisée pour une requête différente. Générez une nouvelle clé pour une nouvelle demande.");
+
     public static DomainError VersionConflict(Guid lineId, long currentVersion) =>
         new(ErrorCodes.CartLineVersionConflict,
             $"La ligne a été modifiée depuis votre dernière lecture (version actuelle : {currentVersion}). Rechargez le panier puis réessayez.",

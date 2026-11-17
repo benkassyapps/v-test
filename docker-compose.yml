@@ -1,0 +1,80 @@
+# Démarrage local complet (PLT-4) : SQL Server → migrateur (seul) → 2 instances de l'API → nginx (:8080).
+#   cp .env.example .env      (puis adapter les valeurs)
+#   docker compose up --build
+# Les valeurs sensibles viennent exclusivement du fichier .env (ignoré par git, PLT-8).
+#
+# Évolution du schéma : le migrateur s'exécute seul au démarrage d'une pile ARRÊTÉE. Pour appliquer une nouvelle
+# migration, arrêter d'abord les instances (docker compose down, sans -v pour garder les données) puis relancer.
+# En production, la migration est une étape du pipeline de déploiement, avant le déploiement des instances.
+
+name: shop
+
+x-connection-string: &connection-string
+  ConnectionStrings__Shop: "Server=sqlserver,1433;Database=Shop;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=true"
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Définir MSSQL_SA_PASSWORD dans .env (voir .env.example)}
+    ports:
+      # Accès local facultatif (outils SQL), limité à la machine : jamais exposé au réseau.
+      - "127.0.0.1:14333:1433"
+    volumes:
+      - sqldata:/var/opt/mssql
+    healthcheck:
+      # Mot de passe transmis par variable d'environnement (SQLCMDPASSWORD) et non en argument visible dans la liste des processus.
+      test: ["CMD-SHELL", "SQLCMDPASSWORD=\"$$MSSQL_SA_PASSWORD\" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # Applique les migrations SEUL, avant les instances (PLT-5) : la migration initiale active READ_COMMITTED_SNAPSHOT,
+  # ce qui exige d'être la seule connexion à la base. Seul service qui construit l'image (partagée avec « api »).
+  migrator:
+    build:
+      context: .
+      dockerfile: src/Shop.Api/Dockerfile
+    image: shop-api:local
+    command: ["--migrate"]
+    environment:
+      <<: *connection-string
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: "no"
+
+  # Deux instances identiques et sans état ; chacune exécute aussi le planificateur de synchronisation
+  # (une seule synchronise réellement grâce au verrou distribué).
+  api:
+    image: shop-api:local
+    pull_policy: never # image construite localement par le service « migrator »
+    deploy:
+      replicas: 2
+    restart: unless-stopped
+    environment:
+      <<: *connection-string
+      Admin__ApiKey: ${ADMIN_API_KEY:?Définir ADMIN_API_KEY dans .env (voir .env.example)}
+      Api__EnableDocs: "true"
+      # Surchargeable pour simuler une panne du fournisseur (ex. CATALOG_BASE_URL=http://fournisseur.invalid).
+      CatalogSync__BaseUrl: ${CATALOG_BASE_URL:-https://dummyjson.com}
+      Logging__Console__FormatterName: json
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+
+  # Répartiteur de charge : round-robin entre les instances (en-tête X-Instance pour le constater).
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  sqldata:

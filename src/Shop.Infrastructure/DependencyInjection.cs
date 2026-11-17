@@ -47,6 +47,7 @@ public static class DependencyInjection
         AddCatalog(services, configuration);
         services.AddScoped<ICartStore, CartStore>();
         services.AddScoped<ICartReader, CartReader>();
+        services.AddHostedService<IdempotencyKeyCleanupService>();
 
         return services;
     }

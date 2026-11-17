@@ -4,6 +4,7 @@ using Shop.Domain.Common;
 
 namespace Shop.Application.Catalog;
 
+/// <summary>Page de produits : passer <c>nextCursor</c> en paramètre <c>cursor</c> pour obtenir la suivante.</summary>
 public sealed record ProductPage(IReadOnlyList<ProductView> Items, string? NextCursor, bool HasMore);
 
 public sealed record SyncRunPage(IReadOnlyList<SyncRun> Items, long? NextBeforeId, bool HasMore);

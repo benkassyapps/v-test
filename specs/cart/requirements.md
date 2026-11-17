@@ -88,6 +88,19 @@
 ### CART-R17 — Supprimer un article
 1. QUAND l'utilisateur appelle `DELETE /api/cart/lines/{lineId}?expectedVersion=N` avec la version à jour, le système DOIT retirer la ligne et renvoyer le panier mis à jour (`200`).
 
+## Robustesse face aux nouvelles tentatives
+
+### CART-R18 — Clé d'idempotence des commandes de ligne
+> Ajoutée après la livraison initiale : une commande validée dont la réponse est perdue (coupure, `503`, délai dépassé) ne doit pas être appliquée une seconde fois quand le client réessaie.
+
+1. Les commandes `POST /api/cart/lines`, `PUT /api/cart/lines/{lineId}` et `DELETE /api/cart/lines/{lineId}` DOIVENT accepter un en-tête facultatif `Idempotency-Key` (1 à 100 caractères parmi lettres, chiffres et `. _ : -`). SI l'en-tête est invalide, ALORS le système DOIT répondre `400`.
+2. Le système DOIT enregistrer la clé et la réponse produite **dans la même transaction** que la modification du panier : la modification et la clé sont validées ensemble, ou pas du tout.
+3. QUAND une commande arrive avec une clé déjà utilisée par le même utilisateur pour la **même** requête, le système NE DOIT PAS la réexécuter : il DOIT renvoyer la réponse d'origine (même statut, même corps) avec l'en-tête `Idempotent-Replayed: true`, y compris si le panier a changé entre-temps.
+4. SI une clé déjà utilisée par le même utilisateur arrive avec une requête **différente**, ALORS le système DOIT répondre `422` (`idempotency_key_reused`) sans rien modifier.
+5. QUAND plusieurs commandes portant la même clé arrivent simultanément, y compris sur des instances différentes, la commande DOIT être appliquée **au plus une fois** et toutes DOIVENT recevoir la même réponse.
+6. Les réponses métier (succès, `404`, `409`, `422`) DOIVENT être enregistrées et rejouées ; les erreurs techniques (`5xx`) NE DOIVENT PAS l'être, pour qu'une nouvelle tentative soit réellement exécutée.
+7. Les clés DOIVENT être propres à chaque utilisateur et expirer après une durée configurable (24 h par défaut) ; une clé expirée DOIT pouvoir être réutilisée.
+
 ## Décisions (ambiguïtés du sujet tranchées, à valider)
 
 | # | Question | Décision | Justification |
@@ -101,3 +114,4 @@
 | D7 | Comment le client transmet-il la version attendue ? | Corps JSON (`expectedVersion`) pour `PUT`, paramètre de requête pour `DELETE`. | Explicite et lisible. `If-Match`/ETag impliquerait un `412` alors que le sujet parle de conflit (`409`). |
 | D8 | Comment sont identifiées les lignes dans l'API ? | Par un identifiant de ligne (`lineId`, GUID), pas par l'identifiant produit. | Une ligne recréée a un nouvel identifiant : une demande obsolète ne peut pas s'appliquer à la nouvelle ligne (CART-R10). |
 | D9 | Montants ? | Décimal à 2 décimales ; montant de ligne = prix conservé × quantité ; total = somme des lignes, produits retirés inclus. | Le sujet impose le calcul à partir des valeurs conservées. Pas de devise (voir CAT D8). |
+| D10 | Clé d'idempotence obligatoire ? | **Facultative** (compatibilité), recommandée dans le README. Rejeu de la réponse **d'origine**, pas de l'état actuel du panier. | Contrat inspiré du brouillon IETF *Idempotency-Key*. Le client relit le panier s'il a besoin de l'état courant. C'est au client de générer UNE clé par intention, réutilisée à chaque tentative. |

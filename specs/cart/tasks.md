@@ -56,3 +56,20 @@
 - **Exigences** : CART-R1 à CART-R17, PLT-1, PLT-2, PLT-3, PLT-6, PLT-7. **Fin** : tous les scénarios verts sur 2 instances.
 
 **🔍 Fin du bloc 4** : `/code-review high` (attention : verrous, ordre des verrous, rollback, création implicite) puis **`/security-review`** (identification, clé admin, isolation des paniers, validation, ProblemDetails, SQL brut paramétré) → tri des constats → validation → commit.
+
+---
+
+## Bloc 7 — Clé d'idempotence (ajout après livraison)
+
+### T7.1 — Spec
+- [x] Exigence CART-R18, décision D10, code `idempotency_key_reused` (PLT-3), scénarios `idempotence.feature`, design §7.
+
+### T7.2 — Implémentation
+- [x] Table `IdempotencyKeys` (migration), enregistrement et rejeu dans la transaction de commande (`CartStore`), empreinte canonique des commandes, expiration et purge.
+- [x] En-têtes `Idempotency-Key` (validation) et `Idempotent-Replayed` ; README.
+- **Exigences** : CART-R18.
+
+### T7.3 — Tests
+- [x] Scénarios `idempotence.feature` (dont confirmation de commit perdue, simulée par un intercepteur qui échoue APRÈS le commit) ; empreinte et format de clé en unitaire ; purge par lots en intégration.
+
+**🔍 Fin du bloc 7** : `/code-review high` (10 constats, tous corrigés, voir `docs/ai-reviews.md`) → validation → commit.

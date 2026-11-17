@@ -63,7 +63,7 @@ public static class SqlServerContainer
     /// </summary>
     public static async Task ResetAsync(string connectionString)
     {
-        string[] tablesInDeletionOrder = ["CartLines", "Carts", "Products", "SyncRuns"];
+        string[] tablesInDeletionOrder = ["IdempotencyKeys", "CartLines", "Carts", "Products", "SyncRuns"];
         string[] identityTables = ["Products", "SyncRuns"];
 
         var statements = tablesInDeletionOrder

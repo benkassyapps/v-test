@@ -19,11 +19,14 @@ public sealed class TestDoubles
 
     public FaultInjectionInterceptor Faults { get; } = new();
 
+    public CommitAcknowledgementLossInterceptor LostCommits { get; } = new();
+
     public void Reset()
     {
         Clock.SetUtcNow(DefaultNow);
         Provider.Reset();
         Logs.Clear();
         Faults.Disarm();
+        LostCommits.Disarm();
     }
 }

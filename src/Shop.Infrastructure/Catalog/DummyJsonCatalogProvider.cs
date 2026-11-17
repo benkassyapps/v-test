@@ -31,8 +31,12 @@ internal sealed class DummyJsonCatalogProvider(HttpClient http, IOptions<Catalog
         {
             while (true)
             {
+                // Délai par page couvrant AUSSI la lecture du corps : GetFromJsonAsync rend la main dès les en-têtes,
+                // hors des délais du pipeline de résilience ; un corps qui cesse d'arriver bloquerait sinon indéfiniment.
+                using var pageDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                pageDeadline.CancelAfter(options.Value.PageTimeout);
                 var page = await http.GetFromJsonAsync<DummyJsonPage>(
-                    $"products?limit={pageSize}&skip={skip}&select={SelectedFields}", Json, cancellationToken);
+                    $"products?limit={pageSize}&skip={skip}&select={SelectedFields}", Json, pageDeadline.Token);
 
                 if (page?.Products is null)
                 {
@@ -59,7 +63,7 @@ internal sealed class DummyJsonCatalogProvider(HttpClient http, IOptions<Catalog
             }
         }
         catch (Exception exception) when (exception is HttpRequestException or TimeoutRejectedException or BrokenCircuitException
-                                              || (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+                                              || (exception is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
             return CatalogErrors.ProviderUnavailable(Describe(exception));
         }
@@ -80,7 +84,7 @@ internal sealed class DummyJsonCatalogProvider(HttpClient http, IOptions<Catalog
         {
             HttpRequestException { StatusCode: { } status } => $"réponse HTTP {(int)status}",
             BrokenCircuitException => "coupe-circuit ouvert après des échecs répétés",
-            TimeoutRejectedException or TaskCanceledException => "délai de réponse dépassé",
+            TimeoutRejectedException or OperationCanceledException => "délai de réponse dépassé (en-têtes ou contenu)",
             _ => "connexion impossible",
         };
 

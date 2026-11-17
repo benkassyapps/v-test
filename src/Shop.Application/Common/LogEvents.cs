@@ -26,6 +26,10 @@ public static class LogEvents
     public static readonly EventId DatabaseMigrationFailed = new(2002, nameof(DatabaseMigrationFailed));
     public static readonly EventId ReadCommittedSnapshotCheckFailed = new(2003, nameof(ReadCommittedSnapshotCheckFailed));
 
+    // 3000–3099 : panier.
+    public static readonly EventId IdempotencyKeysPurged = new(3000, nameof(IdempotencyKeysPurged));
+    public static readonly EventId IdempotencyKeysPurgeFailed = new(3001, nameof(IdempotencyKeysPurgeFailed));
+
     // 9000–9099 : API.
     public static readonly EventId UnhandledException = new(9000, nameof(UnhandledException));
     public static readonly EventId BadRequestRejected = new(9001, nameof(BadRequestRejected));

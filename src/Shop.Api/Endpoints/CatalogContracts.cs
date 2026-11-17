@@ -3,25 +3,6 @@ using Shop.Domain.Catalog;
 
 namespace Shop.Api.Endpoints;
 
-/// <summary>Produit du catalogue local.</summary>
-public sealed record ProductResponse(
-    int Id,
-    int ExternalId,
-    string Name,
-    string Category,
-    decimal Price,
-    int Stock,
-    string AvailabilityStatus,
-    DateTimeOffset LastUpdatedAt)
-{
-    public static ProductResponse From(ProductView product) =>
-        new(product.Id, product.ExternalId, product.Name, product.Category, product.Price, product.Stock,
-            product.AvailabilityStatus, product.LastUpdatedAt);
-}
-
-/// <summary>Page de produits : passer <c>nextCursor</c> en paramètre <c>cursor</c> pour obtenir la suivante.</summary>
-public sealed record ProductPageResponse(IReadOnlyList<ProductResponse> Items, string? NextCursor, bool HasMore);
-
 /// <summary>Résumé d'une exécution de synchronisation.</summary>
 public sealed record SyncRunResponse(
     long Id,

@@ -30,13 +30,12 @@ public static class CatalogEndpoints
         return app;
     }
 
-    private static async Task<Results<Ok<ProductPageResponse>, ProblemHttpResult>> ListProductsAsync(
+    // La vue de lecture est renvoyée telle quelle (comme CartView pour le panier) : aucune copie champ à champ.
+    private static async Task<Results<Ok<ProductPage>, ProblemHttpResult>> ListProductsAsync(
         CatalogQueries queries, int? limit, string? cursor, CancellationToken cancellationToken)
     {
         var page = await queries.ListProductsAsync(limit, cursor, cancellationToken);
-        return page.IsSuccess
-            ? TypedResults.Ok(new ProductPageResponse([.. page.Value.Items.Select(ProductResponse.From)], page.Value.NextCursor, page.Value.HasMore))
-            : page.Error.ToProblem();
+        return page.IsSuccess ? TypedResults.Ok(page.Value) : page.Error.ToProblem();
     }
 
     private static async Task<Results<Ok<SyncRunResponse>, ProblemHttpResult>> SyncAsync(

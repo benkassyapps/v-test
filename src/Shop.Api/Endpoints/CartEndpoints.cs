@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Shop.Api.Auth;
 using Shop.Api.Errors;
 using Shop.Application.Carts;
@@ -59,49 +60,81 @@ public static class CartEndpoints
         ToResponse(await carts.GetAsync(user.GetUserId(), cancellationToken));
 
     private static async Task<Results<Ok<CartView>, ProblemHttpResult>> AddLineAsync(
-        AddCartLineRequest request, ClaimsPrincipal user, CartService carts, CancellationToken cancellationToken)
+        AddCartLineRequest request,
+        [FromHeader(Name = IdempotencyKeyFormat.HeaderName)] string? idempotencyKey,
+        HttpContext context,
+        ClaimsPrincipal user,
+        CartService carts,
+        CancellationToken cancellationToken)
     {
         var errors = new Validation()
             .Require("productId", request.ProductId, "L'identifiant du produit est obligatoire.")
-            .Quantity(request.Quantity);
+            .Quantity(request.Quantity)
+            .IdempotencyKey(idempotencyKey);
         if (errors.HasErrors)
         {
             return errors.ToProblem();
         }
 
-        return ToResponse(await carts.AddItemAsync(user.GetUserId(), request.ProductId!.Value, request.Quantity!.Value, cancellationToken));
+        return ToResponse(context, await carts.AddItemAsync(
+            user.GetUserId(), request.ProductId!.Value, request.Quantity!.Value, idempotencyKey, cancellationToken));
     }
 
     private static async Task<Results<Ok<CartView>, ProblemHttpResult>> ChangeQuantityAsync(
-        Guid lineId, ChangeQuantityRequest request, ClaimsPrincipal user, CartService carts, CancellationToken cancellationToken)
+        Guid lineId,
+        ChangeQuantityRequest request,
+        [FromHeader(Name = IdempotencyKeyFormat.HeaderName)] string? idempotencyKey,
+        HttpContext context,
+        ClaimsPrincipal user,
+        CartService carts,
+        CancellationToken cancellationToken)
     {
         var errors = new Validation()
             .Quantity(request.Quantity)
-            .Require("expectedVersion", request.ExpectedVersion, "La version de la ligne consultée (expectedVersion) est obligatoire.");
+            .Require("expectedVersion", request.ExpectedVersion, "La version de la ligne consultée (expectedVersion) est obligatoire.")
+            .IdempotencyKey(idempotencyKey);
         if (errors.HasErrors)
         {
             return errors.ToProblem();
         }
 
-        return ToResponse(await carts.ChangeQuantityAsync(
-            user.GetUserId(), lineId, request.Quantity!.Value, request.ExpectedVersion!.Value, cancellationToken));
+        return ToResponse(context, await carts.ChangeQuantityAsync(
+            user.GetUserId(), lineId, request.Quantity!.Value, request.ExpectedVersion!.Value, idempotencyKey, cancellationToken));
     }
 
     private static async Task<Results<Ok<CartView>, ProblemHttpResult>> RemoveLineAsync(
-        Guid lineId, long? expectedVersion, ClaimsPrincipal user, CartService carts, CancellationToken cancellationToken)
+        Guid lineId,
+        long? expectedVersion,
+        [FromHeader(Name = IdempotencyKeyFormat.HeaderName)] string? idempotencyKey,
+        HttpContext context,
+        ClaimsPrincipal user,
+        CartService carts,
+        CancellationToken cancellationToken)
     {
         var errors = new Validation()
-            .Require("expectedVersion", expectedVersion, "La version de la ligne consultée (paramètre expectedVersion) est obligatoire.");
+            .Require("expectedVersion", expectedVersion, "La version de la ligne consultée (paramètre expectedVersion) est obligatoire.")
+            .IdempotencyKey(idempotencyKey);
         if (errors.HasErrors)
         {
             return errors.ToProblem();
         }
 
-        return ToResponse(await carts.RemoveLineAsync(user.GetUserId(), lineId, expectedVersion!.Value, cancellationToken));
+        return ToResponse(context, await carts.RemoveLineAsync(user.GetUserId(), lineId, expectedVersion!.Value, idempotencyKey, cancellationToken));
     }
 
     private static Results<Ok<CartView>, ProblemHttpResult> ToResponse(Result<CartView> result) =>
         result.IsSuccess ? TypedResults.Ok(result.Value) : result.Error.ToProblem();
+
+    /// <summary>Réponse d'une commande ; signale par un en-tête qu'il s'agit du rejeu de la réponse d'origine (CART-R18.3).</summary>
+    private static Results<Ok<CartView>, ProblemHttpResult> ToResponse(HttpContext context, CartCommandResponse response)
+    {
+        if (response.Replayed)
+        {
+            context.Response.Headers[IdempotencyKeyFormat.ReplayedHeaderName] = "true";
+        }
+
+        return ToResponse(response.Result);
+    }
 
     /// <summary>Validation explicite des entrées, avec messages en français et détail par champ (PLT-3).</summary>
     private sealed class Validation
@@ -116,6 +149,17 @@ public static class CartEndpoints
             if (value is null)
             {
                 _errors[field] = [message];
+            }
+
+            return this;
+        }
+
+        public Validation IdempotencyKey(string? key)
+        {
+            if (key is not null && !IdempotencyKeyFormat.IsValid(key))
+            {
+                _errors[IdempotencyKeyFormat.HeaderName] =
+                    [$"La clé d'idempotence doit comporter 1 à {IdempotencyKeyFormat.MaxLength} caractères parmi lettres, chiffres et « . _ : - »."];
             }
 
             return this;

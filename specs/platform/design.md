@@ -46,7 +46,7 @@ Shop.slnx
 | Microsoft.Extensions.Http.Resilience | Appels au fournisseur | Retry, timeout, circuit breaker standard (Polly v8). |
 | Microsoft.AspNetCore.OpenApi + Scalar.AspNetCore | Documentation (PLT-7) | OpenAPI natif .NET 10 + interface d'exploration. |
 | xUnit v3, Reqnroll.xunit.v3, Testcontainers.MsSql | Tests | Reqnroll ≥ 3.1 prend en charge xUnit v3 ; SQL Server réel en test. |
-| Microsoft.Extensions.TimeProvider.Testing, Microsoft.Extensions.Diagnostics.Testing | Tests | `FakeTimeProvider` (horloge) et `FakeLogger` (vérification des logs, CAT-R12). |
+| Microsoft.Extensions.Diagnostics.Testing | Tests | `FakeLogger` (vérification des logs, CAT-R12). Horloge de test maison `TestClock` (réglable dans les deux sens, contrairement à `FakeTimeProvider`). |
 
 ## 3. Pipeline HTTP (`Shop.Api/Program.cs`)
 
@@ -132,7 +132,7 @@ Secrets (PLT-8) : aucune valeur sensible dans `appsettings*.json`. On utilise le
 - **Deux hôtes** `WebApplicationFactory<Program>` (`Instance:Id = instance-1 / instance-2`) sur la même base : les scénarios multi-instance envoient leurs requêtes à l'un ou à l'autre.
 - Services remplacés dans les deux hôtes (instances partagées) :
   - `FakeDummyJsonHandler` (`HttpMessageHandler` du client fournisseur) : catalogue programmable, pagination réelle, pannes à partir de la page N, total mensonger, et **porte** (`TaskCompletionSource`) pour maintenir une synchro « en cours » ;
-  - `FakeTimeProvider` : horloge contrôlée ;
+  - `TestClock` : horloge métier contrôlée, réglable en avant comme en arrière (les scénarios du planificateur fixent des instants passés) ;
   - `FakeLogCollector` : vérification des événements de log ;
   - `FaultInjectionInterceptor` (EF `SaveChangesInterceptor`) : lève une `TimeoutException` tant qu'il est armé, pour simuler une panne de base (CART-R12, CAT-R8).
 - Le planificateur `BackgroundService` est **désactivé** en test (`CatalogSync:SchedulerEnabled=false`). Les scénarios appellent directement `ICatalogSyncScheduler.CheckAsync()` sur l'instance voulue.

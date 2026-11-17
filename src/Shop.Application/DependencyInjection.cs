@@ -24,6 +24,10 @@ public static class DependencyInjection
         services.AddScoped<CatalogSyncService>();
         services.AddScoped<CatalogSyncScheduler>();
         services.AddScoped<CatalogQueries>();
+        services.AddOptions<CartOptions>()
+            .BindConfiguration(CartOptions.SectionName)
+            .Validate(options => options.IdempotencyKeyTtl > TimeSpan.Zero, "Cart:IdempotencyKeyTtl doit être positive.")
+            .ValidateOnStart();
         services.AddScoped<CartService>();
 
         return services;

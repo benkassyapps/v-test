@@ -22,7 +22,7 @@ internal sealed partial class GlobalExceptionHandler(
             // Le statut porté par l'exception est conservé (413 corps trop volumineux, 408, 431…).
             BadHttpRequestException badRequest => (ErrorCodes.ValidationFailed, "Le corps ou les paramètres de la requête sont invalides ou trop volumineux.", (int?)badRequest.StatusCode),
             _ when DatabaseFailures.IsTransient(exception) =>
-                (ErrorCodes.ServiceUnavailable, "La base de données est momentanément indisponible. Aucune modification n'a été enregistrée ; réessayez plus tard.", null),
+                (ErrorCodes.ServiceUnavailable, "La base de données est momentanément indisponible et le résultat de l'opération est incertain : elle a pu être enregistrée juste avant l'incident. Pour réessayer sans risque de double application, renvoyez la même demande avec la même clé d'idempotence (en-tête Idempotency-Key).", null),
             _ => (ErrorCodes.InternalError, "Une erreur inattendue est survenue. Aucune information interne n'est communiquée.", null),
         };
 

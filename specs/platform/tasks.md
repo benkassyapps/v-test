@@ -53,7 +53,7 @@
 - **Exigences** : PLT-5. **Fin** : `dotnet run -- --migrate` sur un SQL Server local crée la base avec RCSI.
 
 ### T1.6 — Infrastructure de test partagée
-- [x] `Shop.Testing` : conteneur SQL Server (Testcontainers) unique et migré, remise à zéro des tables, deux `WebApplicationFactory` (`instance-1`, `instance-2`), `FakeTimeProvider`, collecteur de logs, `FaultInjectionInterceptor`, clients HTTP par utilisateur et par instance.
+- [x] `Shop.Testing` : conteneur SQL Server (Testcontainers) unique et migré, remise à zéro des tables, deux `WebApplicationFactory` (`instance-1`, `instance-2`), `TestClock` (horloge réglable), collecteur de logs, `FaultInjectionInterceptor`, clients HTTP par utilisateur et par instance.
 - [x] `FakeDummyJsonHandler` (catalogue programmable, pagination, panne à partir de la page N, total mensonger, porte de blocage). Il sera utilisé à partir du bloc 3 et créé ici pour stabiliser l'API de test.
 - [x] Tests d'intégration : migrations appliquées et RCSI actif (**PLT-5**) ; deux hôtes répondent avec des `X-Instance` différents.
 - [x] Test unitaire **PLT-8** : aucun secret non vide dans les `appsettings*.json` versionnés.
@@ -71,15 +71,15 @@
 ## Bloc 5 — Exécution locale
 
 ### T5.1 — Conteneurisation
-- [ ] `src/Shop.Api/Dockerfile` multi-étapes, utilisateur non root.
-- [ ] `docker-compose.yml` : `sqlserver` (healthcheck) → `migrator` (`--migrate`) → `api` (`replicas: 2`) → `nginx` (`:8080`).
-- [ ] `deploy/nginx.conf` (resolver Docker, round-robin), `.env.example` (valeurs factices), `.env` ignoré par git.
+- [x] `src/Shop.Api/Dockerfile` multi-étapes, utilisateur non root.
+- [x] `docker-compose.yml` : `sqlserver` (healthcheck) → `migrator` (`--migrate`) → `api` (`replicas: 2`) → `nginx` (`:8080`).
+- [x] `deploy/nginx.conf` (resolver Docker, round-robin), `.env.example` (valeurs factices), `.env` ignoré par git.
 - **Exigences** : PLT-4, PLT-8.
 
 ### T5.2 — Vérification manuelle multi-instance
-- [ ] `src/Shop.Api/Shop.Api.http` : appels de toutes les opérations, dont le scénario d'Alice.
-- [ ] Déroulé vérifié et consigné : `docker compose up --build` ; synchro manuelle (≈194 insertions) puis relance (0 changement) ; `X-Instance` qui alterne ; Alice v4 → v6 ; même ligne → 409 ; `BaseUrl` invalide → `Failed`, produits toujours listés ; `sync-status`.
-- **Exigences** : PLT-4 (exemptée de `TraceabilityTests`, vérifiée ici). **Fin** : résultats notés dans le README.
+- [x] `src/Shop.Api/Shop.Api.http` : appels de toutes les opérations, dont le scénario d'Alice.
+- [x] Déroulé vérifié et consigné : `docker compose up --build` ; synchro manuelle (≈194 insertions) puis relance (0 changement) ; `X-Instance` qui alterne ; Alice v4 → v6 ; même ligne → 409 ; `BaseUrl` invalide → `Failed`, produits toujours listés ; `sync-status`.
+- **Exigences** : PLT-4 (exemptée de `TraceabilityTests`, vérifiée ici). **Fin** : résultats consignés dans [docs/verification-manuelle.md](../../docs/verification-manuelle.md), repris dans le README (bloc 6).
 
 **🔍 Fin du bloc 5** : `/code-review high` → tri → validation → commit.
 
@@ -88,18 +88,18 @@
 ## Bloc 6 — Documentation et livraison
 
 ### T6.1 — README.md
-- [ ] Prérequis, démarrage (compose et local), tests, synchro manuelle (curl), appels principaux de l'API, identification de l'utilisateur, contrat d'erreurs, configuration.
+- [x] Prérequis, démarrage (compose et local), tests, synchro manuelle (curl), appels principaux de l'API, identification de l'utilisateur, contrat d'erreurs, configuration.
 
-### T6.2 — DECISIONS.md (≤ 2 pages)
-- [ ] Architecture et alternatives écartées, concurrence du panier, synchro (instantané, transaction, garde-fou, verrou), planification, pagination, limites, évolutions. Synthèse des `design.md`, sans les recopier.
+### T6.2 — docs/DECISIONS.md (≤ 2 pages)
+- [x] Architecture et alternatives écartées, concurrence du panier, synchro (instantané, transaction, garde-fou, verrou), planification, pagination, limites, évolutions. Synthèse des `design.md`, sans les recopier.
 
 ### T6.3 — Bilan IA
-- [ ] Finaliser `AI_USAGE.md` (outils, démarche, vérifications, journal) et `docs/ai-reviews.md`.
-- [ ] Inventaire des fichiers d'outillage réellement utilisés (`AGENTS.md`, `CLAUDE.md`, `.claude/commands/*`), sans secret ni historique de conversation.
+- [x] Finaliser `docs/AI_USAGE.md` (outils, démarche, vérifications, journal) et `docs/ai-reviews.md`.
+- [x] Inventaire des fichiers d'outillage réellement utilisés (`AGENTS.md`, `CLAUDE.md`, `.claude/commands/*`), sans secret ni historique de conversation.
 
 ### T6.4 — Revue finale
-- [ ] Tous les `.feature` inclus ; `TraceabilityTests` vert ; matrice entièrement à ✅.
-- [ ] **`/security-review` final** → tri des constats.
+- [x] Tous les `.feature` inclus ; `TraceabilityTests` vert ; matrice entièrement à ✅.
+- [x] **`/security-review` final** → tri des constats (aucune vulnérabilité haute ou moyenne).
 - [ ] Relecture complète du dépôt par le candidat.
 
 **🔍 Fin du bloc 6** : validation finale → commit.

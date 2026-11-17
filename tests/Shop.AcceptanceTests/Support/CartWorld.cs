@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Shop.Application.Carts;
 using Shop.Domain.Carts;
 using Shop.Domain.Catalog;
 using Shop.Testing.Hosting;
@@ -9,7 +10,7 @@ using Shop.Testing.Hosting;
 namespace Shop.AcceptanceTests.Support;
 
 /// <summary>Requête de panier préparée, pour les envois simultanés.</summary>
-public sealed record PendingCartRequest(int Instance, string User, HttpMethod Method, string Path, object? Body, int? RequestedQuantity);
+public sealed record PendingCartRequest(int Instance, string User, HttpMethod Method, string Path, object? Body, int? RequestedQuantity, string? IdempotencyKey = null);
 
 /// <summary>
 /// État et actions partagés par les étapes du panier : envoi des commandes par utilisateur et par instance,
@@ -27,30 +28,25 @@ public sealed class CartWorld(ShopTestCluster cluster, ScenarioHttp http)
 
     // --- Envoi ---
 
-    public async Task<HttpResponseMessage> SendAsync(string user, HttpMethod method, string path, object? body = null, int instance = 1)
+    public async Task<HttpResponseMessage> SendAsync(string user, HttpMethod method, string path, object? body = null, int instance = 1, string? idempotencyKey = null)
     {
         LastUser = user;
         using var client = cluster.CreateClient(instance, user);
-        using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
-        if (body is not null)
-        {
-            request.Content = JsonContent.Create(body);
-        }
-
+        using var request = BuildRequest(method, path, body, idempotencyKey);
         return await http.SendAsync(client, request);
     }
 
     /// <summary>Envoi d'une commande « Quand » : photographie l'état de tous les paniers avant l'envoi.</summary>
-    public async Task<HttpResponseMessage> CommandAsync(string user, HttpMethod method, string path, object? body = null, int instance = 1)
+    public async Task<HttpResponseMessage> CommandAsync(string user, HttpMethod method, string path, object? body = null, int instance = 1, string? idempotencyKey = null)
     {
         await CaptureStatesAsync();
-        return await SendAsync(user, method, path, body, instance);
+        return await SendAsync(user, method, path, body, instance, idempotencyKey);
     }
 
     /// <summary>Envoi d'une commande de préparation (« Étant donné ») qui doit réussir.</summary>
-    public async Task GivenAsync(string user, HttpMethod method, string path, object? body = null, int instance = 1)
+    public async Task GivenAsync(string user, HttpMethod method, string path, object? body = null, int instance = 1, string? idempotencyKey = null)
     {
-        using var response = await SendRawAsync(user, method, path, body, instance);
+        using var response = await SendRawAsync(user, method, path, body, instance, idempotencyKey);
         Assert.True(response.IsSuccessStatusCode, $"Préparation en échec ({(int)response.StatusCode}) : {await response.Content.ReadAsStringAsync()}");
     }
 
@@ -61,7 +57,7 @@ public sealed class CartWorld(ShopTestCluster cluster, ScenarioHttp http)
         var tasks = requests.Select(async request =>
         {
             await start.Task;
-            var response = await SendRawAsync(request.User, request.Method, request.Path, request.Body, request.Instance);
+            var response = await SendRawAsync(request.User, request.Method, request.Path, request.Body, request.Instance, request.IdempotencyKey);
             var text = await response.Content.ReadAsStringAsync();
             JsonElement? body = text.Length == 0 ? null : JsonDocument.Parse(text).RootElement.Clone();
             return (request, response, body);
@@ -82,11 +78,17 @@ public sealed class CartWorld(ShopTestCluster cluster, ScenarioHttp http)
         return cart;
     }
 
-    /// <summary>Indique l'utilisateur concerné par les vérifications suivantes, et lit son panier s'il existe.</summary>
-    public async Task<JsonElement?> ReadCartAsyncOrNull(string user)
+    /// <summary>
+    /// Désigne l'utilisateur concerné par les vérifications suivantes (après des envois simultanés, il n'y a pas de
+    /// « dernière réponse ») et mémorise son panier s'il existe.
+    /// </summary>
+    public async Task FocusOnAsync(string user)
     {
         LastUser = user;
-        return await CartCountAsync(user) == 0 ? null : await ReadCartAsync(user);
+        if (await CartCountAsync(user) > 0)
+        {
+            await ReadCartAsync(user);
+        }
     }
 
     public void RememberRead(string user, JsonElement cart) => _lastRead[user] = cart;
@@ -100,6 +102,24 @@ public sealed class CartWorld(ShopTestCluster cluster, ScenarioHttp http)
 
     public async Task<JsonElement> LineAsync(string user, string productName) =>
         FindLine(await ReadCartAsync(user), productName) ?? throw new InvalidOperationException($"Pas de ligne « {productName} » dans le panier de {user}.");
+
+    /// <summary>
+    /// Identifiant de la ligne d'un produit ; s'il n'existe plus (ligne supprimée), le dernier identifiant connu :
+    /// permet de renvoyer à l'identique une demande déjà traitée (clé d'idempotence).
+    /// </summary>
+    public async Task<Guid> LineIdAsync(string user, string productName)
+    {
+        if (FindLine(await ReadCartAsync(user), productName) is { } line)
+        {
+            var id = line.GetProperty("lineId").GetGuid();
+            _knownLineIds[$"{user}|{productName}"] = id;
+            return id;
+        }
+
+        return _knownLineIds[$"{user}|{productName}"];
+    }
+
+    private readonly Dictionary<string, Guid> _knownLineIds = [];
 
     public void Memorize(string user, string productName, Guid lineId) => _memorizedLines[$"{user}|{productName}"] = lineId;
 
@@ -145,15 +165,26 @@ public sealed class CartWorld(ShopTestCluster cluster, ScenarioHttp http)
                     $"{line.Id}:{line.ProductName}:{line.UnitPrice}:{line.Quantity}:v{line.Version}"))));
     }
 
-    private async Task<HttpResponseMessage> SendRawAsync(string user, HttpMethod method, string path, object? body, int instance)
+    private async Task<HttpResponseMessage> SendRawAsync(string user, HttpMethod method, string path, object? body, int instance, string? idempotencyKey = null)
     {
         using var client = cluster.CreateClient(instance, user);
-        using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
+        using var request = BuildRequest(method, path, body, idempotencyKey);
+        return await client.SendAsync(request);
+    }
+
+    private static HttpRequestMessage BuildRequest(HttpMethod method, string path, object? body, string? idempotencyKey)
+    {
+        var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
         if (body is not null)
         {
             request.Content = JsonContent.Create(body);
         }
 
-        return await client.SendAsync(request);
+        if (idempotencyKey is not null)
+        {
+            request.Headers.TryAddWithoutValidation(IdempotencyKeyFormat.HeaderName, idempotencyKey);
+        }
+
+        return request;
     }
 }

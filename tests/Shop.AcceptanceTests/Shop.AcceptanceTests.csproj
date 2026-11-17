@@ -36,6 +36,7 @@
     <ReqnrollFeatureFiles Include="..\..\specs\cart\acceptance\modification-suppression.feature" Link="Features\cart\modification-suppression.feature" />
     <ReqnrollFeatureFiles Include="..\..\specs\cart\acceptance\concurrence.feature" Link="Features\cart\concurrence.feature" />
     <ReqnrollFeatureFiles Include="..\..\specs\cart\acceptance\panier-et-synchronisation.feature" Link="Features\cart\panier-et-synchronisation.feature" />
+    <ReqnrollFeatureFiles Include="..\..\specs\cart\acceptance\idempotence.feature" Link="Features\cart\idempotence.feature" />
     <ReqnrollFeatureFiles Include="..\..\specs\platform\acceptance\plateforme.feature" Link="Features\platform\plateforme.feature" />
   </ItemGroup>
 </Project>

@@ -227,6 +227,7 @@ public sealed class CartSteps(CartWorld carts, CatalogWorld catalog, ScenarioHtt
         Assert.Null(CartWorld.FindLine(await carts.ReadCartAsync(user), product));
 
     [Then("la ligne {string} du panier d'{string} a la quantité {int}")]
+    [Then("la ligne {string} du panier de {string} a la quantité {int}")]
     public async Task LineQuantity(string product, string user, int quantity) =>
         Assert.Equal(quantity, (await carts.LineAsync(user, product)).GetProperty("quantity").GetInt32());
 

@@ -54,6 +54,28 @@ public sealed class CatalogInfrastructureTests(ClusterFixture fixture) : Integra
         Assert.Equal(2, Cluster.Doubles.Provider.RequestCount); // 1 essai + 1 nouvelle tentative (configuration de test)
     }
 
+    [Fact(DisplayName = "Un corps de réponse qui cesse d'arriver après les en-têtes n'immobilise pas la synchronisation")]
+    [Trait("Spec", "CAT-R8")]
+    [Trait("Spec", "CAT-R7")]
+    public async Task Stalled_response_body_fails_within_page_timeout()
+    {
+        // Cas observé en vérification manuelle : en-têtes reçus, puis plus rien. Les délais du pipeline de résilience
+        // s'arrêtent aux en-têtes ; seul le délai par page (5 s en test) borne la lecture du corps.
+        Cluster.Doubles.Provider.SetProducts(Products(3));
+        Cluster.Doubles.Provider.MaxPageSize = 2;
+        Cluster.Doubles.Provider.StallBodyFromPage = 2;
+        var started = System.Diagnostics.Stopwatch.StartNew();
+
+        var result = await RunManualAsync(instance: 1);
+
+        Assert.InRange(started.Elapsed, TimeSpan.Zero, TimeSpan.FromSeconds(20));
+        Assert.Equal(ErrorCodes.ProviderUnavailable, result.Error!.Code);
+        await using var db = Cluster.CreateDbContext();
+        var run = await db.Set<SyncRun>().SingleAsync(Ct);
+        Assert.Equal((SyncRunStatus.Failed, SyncFailureReason.ProviderError), (run.Status, run.FailureReason!.Value));
+        Assert.Equal(0, await db.Set<Product>().CountAsync(Ct));
+    }
+
     // --- Contraintes (CAT-R4) ---
 
     [Fact(DisplayName = "La base refuse deux produits avec le même identifiant fournisseur")]
