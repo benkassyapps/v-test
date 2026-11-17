@@ -9,16 +9,17 @@ SQL Server, **plusieurs instances en parallèle**. Le sujet est dans `docs/EXERC
 ## Démarche : spec-driven development (obligatoire)
 1. **La spec est la source de vérité** : `specs/constitution.md` (principes non négociables), puis, par fonctionnalité, `requirements.md` → `acceptance/*.feature` → `design.md` → `tasks.md`.
 2. **Aucun code sans exigence identifiée** (`CAT-R*`, `CART-R*`, `PLT-*`). Si une demande ne correspond à aucune exigence, le signaler au lieu de coder.
-3. **Si un comportement doit changer, modifier la spec d'abord** (exigence, scénario, design), la faire valider, puis coder.
+3. **Si un comportement doit changer, modifier la spec d'abord** (exigence, scénario, design), la faire valider, puis coder. Après la modification, lancer `/spec-check` : il transforme les exigences devenues non couvertes en liste de scénarios et de tests à écrire.
 4. On travaille **tâche par tâche** dans l'ordre de `specs/platform/tasks.md`. À la fin d'une tâche :
-   - `dotnet build` sans avertissement et `dotnet test` vert ;
+   - `dotnet build` sans avertissement et `dotnet test` vert ; si `TraceabilityTests` échoue, `/spec-check` en explique la cause ;
    - tests tracés : `[Trait("Spec", "CART-R9")]` en xUnit, tag `@CART-R9` en Gherkin ;
    - case de la tâche cochée et `specs/traceability.md` mis à jour.
 5. Les `.feature` vivent sous `specs/` et sont **exécutés** par `tests/Shop.AcceptanceTests` (Reqnroll, Gherkin français). Ne jamais les dupliquer dans le projet de test.
 
 ## Boucle de revue
-- Fin de chaque bloc : `/code-review high` sur le diff du bloc.
-- Fin du bloc 4 et avant livraison : `/security-review`.
+- Fin de chaque bloc : `/spec-check` (couverture des exigences **et** cohérence de la matrice `specs/traceability.md`, que le test ne vérifie pas), puis `/code-review high` sur le diff du bloc.
+- Avant livraison : `/spec-check`, puis `/security-review`.
+- Fin du bloc 4 (premier bloc qui expose l'API du panier) : `/security-review`.
 - Chaque constat est **corrigé**, **rejeté avec justification** ou **reporté** (ajouté à un `tasks.md`), puis consigné dans `docs/ai-reviews.md`. Aucune correction appliquée sans être comprise.
 - Les propositions de l'IA modifiées ou rejetées par le candidat sont consignées dans `docs/ai-journal.md` ; les plus significatives sont reprises dans le bilan `docs/AI_USAGE.md`.
 
