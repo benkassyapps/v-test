@@ -8,7 +8,7 @@ Service HTTP qui :
 ### Par où commencer
 
 1. **Ce README** : démarrer, tester, appeler l'API.
-2. **[docs/DECISIONS.md](docs/DECISIONS.md)** : architecture, décisions, compromis, limites et évolutions (2 pages).
+2. **[DECISIONS.md](DECISIONS.md)** : architecture, décisions, compromis, limites et évolutions (2 pages).
 3. **[docs/AI_USAGE.md](docs/AI_USAGE.md)** : bilan de l'usage de l'IA et outillage fourni.
 
 Le reste est en **annexe**, à consulter pour le détail d'un point :
@@ -38,6 +38,7 @@ Au premier démarrage, le planificateur synchronise le catalogue automatiquement
 - Santé : <http://localhost:8080/health>
 - Documentation interactive de l'API (Scalar) : <http://localhost:8080/scalar> — description OpenAPI : `/openapi/v1.json`
 - Arrêt : `docker compose down` (ajouter `-v` pour effacer aussi la base)
+- **Après une mise à jour du code**, sur une pile déjà lancée : `docker compose down` (sans `-v`, la base est conservée) puis `docker compose up --build -d`. Sans reconstruction, les instances gardent l'ancienne image ; et le migrateur ne s'exécute seul, comme il le doit, qu'au démarrage d'une pile arrêtée.
 
 ### Sans Docker pour l'API (développement)
 
@@ -94,7 +95,7 @@ Simuler une panne du fournisseur : `CATALOG_BASE_URL=http://fournisseur.invalid 
 
 ## 4. Appeler l'API
 
-L'**utilisateur courant** est identifié par l'en-tête `X-User-Id` (1 à 64 caractères parmi lettres, chiffres et `. _ - @`, sensible à la casse). Ce n'est pas une authentification : voir [docs/DECISIONS.md](docs/DECISIONS.md). Aucune route ne prend d'identifiant de panier : chacun n'accède qu'au sien. Le fichier [src/Shop.Api/Shop.Api.http](src/Shop.Api/Shop.Api.http) contient tous les appels.
+L'**utilisateur courant** est identifié par l'en-tête `X-User-Id` (1 à 64 caractères parmi lettres, chiffres et `. _ - @`, sensible à la casse). Ce n'est pas une authentification : voir [DECISIONS.md](DECISIONS.md). Aucune route ne prend d'identifiant de panier : chacun n'accède qu'au sien. Le fichier [src/Shop.Api/Shop.Api.http](src/Shop.Api/Shop.Api.http) contient tous les appels.
 
 ```bash
 B=http://localhost:8080
@@ -172,6 +173,7 @@ specs/          spécifications (source de vérité) : constitution, requirement
 src/            Shop.Domain (règles pures) ← Shop.Application (cas d'usage) ← Shop.Infrastructure (SQL Server, DummyJSON) / Shop.Api
 tests/          Shop.UnitTests, Shop.IntegrationTests, Shop.AcceptanceTests (Reqnroll), Shop.Testing (infrastructure partagée)
 deploy/         configuration nginx
-docs/           DECISIONS.md, bilan IA (AI_USAGE.md, ai-journal.md), énoncé, vérification manuelle, journal des revues
+docs/           bilan IA (AI_USAGE.md, ai-journal.md), énoncé, vérification manuelle, journal des revues
+DECISIONS.md    architecture, décisions, compromis, limites et évolutions
 AGENTS.md       instructions des agents IA (CLAUDE.md y renvoie) ; .claude/commands : commandes /spec-task et /spec-check
 ```

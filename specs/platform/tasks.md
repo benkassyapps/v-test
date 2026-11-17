@@ -89,7 +89,7 @@
 ### T6.1 — README.md
 - [x] Prérequis, démarrage (compose et local), tests, synchro manuelle (curl), appels principaux de l'API, identification de l'utilisateur, contrat d'erreurs, configuration.
 
-### T6.2 — docs/DECISIONS.md (≤ 2 pages)
+### T6.2 — DECISIONS.md (≤ 2 pages, à la racine du dépôt)
 - [x] Architecture et alternatives écartées, concurrence du panier, synchro (instantané, transaction, garde-fou, verrou), planification, pagination, limites, évolutions. Synthèse des `design.md`, sans les recopier.
 
 ### T6.3 — Bilan IA
