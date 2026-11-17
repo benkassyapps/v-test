@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Secrets locaux (voir .env.example)
 .env
+
+# Énoncé du recruteur : conservé localement, jamais publié
+docs/EXERCICE_CANDIDAT.md

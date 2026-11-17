@@ -4,7 +4,7 @@ Ce fichier guide tout agent IA (Claude Code, Copilot, Codex…) qui travaille su
 
 ## Le projet en bref
 Service .NET 10 : catalogue de produits synchronisé chaque jour depuis DummyJSON et panier personnel par utilisateur.
-SQL Server, **plusieurs instances en parallèle**. Le sujet est dans `docs/EXERCICE_CANDIDAT.md`.
+SQL Server, **plusieurs instances en parallèle**. L'énoncé du recruteur n'est pas versionné (copie locale éventuelle : `docs/EXERCICE_CANDIDAT.md`) ; les exigences qui en découlent sont dans `specs/`.
 
 ## Démarche : spec-driven development (obligatoire)
 1. **La spec est la source de vérité** : `specs/constitution.md` (principes non négociables), puis, par fonctionnalité, `requirements.md` → `acceptance/*.feature` → `design.md` → `tasks.md`.

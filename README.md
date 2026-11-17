@@ -173,7 +173,7 @@ specs/          spécifications (source de vérité) : constitution, requirement
 src/            Shop.Domain (règles pures) ← Shop.Application (cas d'usage) ← Shop.Infrastructure (SQL Server, DummyJSON) / Shop.Api
 tests/          Shop.UnitTests, Shop.IntegrationTests, Shop.AcceptanceTests (Reqnroll), Shop.Testing (infrastructure partagée)
 deploy/         configuration nginx
-docs/           bilan IA (AI_USAGE.md, ai-journal.md), énoncé, vérification manuelle, journal des revues
+docs/           bilan IA (AI_USAGE.md, ai-journal.md), vérification manuelle, journal des revues
 DECISIONS.md    architecture, décisions, compromis, limites et évolutions
 AGENTS.md       instructions des agents IA (CLAUDE.md y renvoie) ; .claude/commands : commandes /spec-task et /spec-check
 ```
