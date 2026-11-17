@@ -1,8 +1,7 @@
 # Tâches — Plateforme, et ordre d'exécution global
 
 > Convention : chaque tâche indique les exigences couvertes, ce qui est livré, les tests attendus et son critère de fin.
-> Une tâche n'est cochée que lorsque `dotnet build` passe sans avertissement et que `dotnet test` est vert.
-> La matrice [`../traceability.md`](../traceability.md) est mise à jour à la fin de chaque tâche.
+> Déroulé d'une tâche, critère de fin et mise à jour de la matrice [`../traceability.md`](../traceability.md) : [`.claude/commands/spec-task.md`](../../.claude/commands/spec-task.md).
 
 ## Ordre d'exécution global
 
@@ -100,6 +99,17 @@
 ### T6.4 — Revue finale
 - [x] Tous les `.feature` inclus ; `TraceabilityTests` vert ; matrice entièrement à ✅.
 - [x] **`/security-review` final** → tri des constats (aucune vulnérabilité haute ou moyenne).
-- [ ] Relecture complète du dépôt par le candidat.
+- [x] Relecture complète du dépôt par le candidat.
 
 **🔍 Fin du bloc 6** : validation finale → commit.
+
+---
+
+## Évolutions reportées
+
+### E1 — Traçabilité : lire les traits avec l'analyseur syntaxique C# (Roslyn)
+- **Constat** : `TraceabilityAnalyzer.TraitReferences` cherche `Trait("Spec", "…")` par expression régulière dans le texte des `.cs`. Un trait placé dans un commentaire (`//`, `/* */`), dans une chaîne ou dans du code désactivé (`#if false`) compte à tort comme une couverture, de même qu'un test désactivé (`[Fact(Skip = "…")]`).
+- **Pourquoi pas une expression régulière plus fine** : retirer les commentaires casse sur les URL et le SQL des chaînes (`"https://…"`, `"/* … */"`) et sur les chaînes brutes `"""…"""` multilignes.
+- **Évolution** : parcourir l'arbre syntaxique (`Microsoft.CodeAnalysis.CSharp`, dépendance de `Shop.UnitTests` uniquement) et ne retenir que les vrais attributs `Trait("Spec", …)`, hors tests marqués `Skip`. Même signature, aucun changement pour `TraceabilityTests`. Tests à ajouter dans `TraceabilityAnalyzerTests` : trait sous `//`, sous `/* */`, dans une chaîne, sous `#if false`, sur un test `Skip`.
+- **Écarté** : lecture des traits par réflexion dans les DLL de test (dépendances entre projets de test, build alourdi, plus de lancement rapide sans Docker).
+- **Limite conservée volontairement** : le contrôle vérifie la **présence** d'un test, pas sa réussite ; c'est le rôle de `dotnet test Shop.slnx`.

@@ -1,6 +1,6 @@
 # Matrice de traçabilité
 
-> Exigence → où elle est vérifiée. Mise à jour à la fin de chaque tâche.
+> Exigence → où elle est vérifiée. Mise à jour à la fin de chaque tâche (déroulé : [`.claude/commands/spec-task.md`](../.claude/commands/spec-task.md)).
 > La couverture est contrôlée automatiquement par `TraceabilityTests` (tags `@ID` des `.feature` et `Trait("Spec", "ID")` des tests xUnit).
 > Statut : ⏳ spécifié, pas encore implémenté · 🟡 règles implémentées et testées unitairement, intégration ou acceptation à venir · ✅ implémenté et vert de bout en bout.
 

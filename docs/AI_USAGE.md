@@ -7,14 +7,16 @@
 - **Validation humaine à chaque phase** (exigences, design, tâches, chaque bloc d'implémentation). L'IA propose des options argumentées ; le candidat challenge, tranche et valide chaque commit.
 - **Boucle de revue** : `/code-review high` à la fin de chaque bloc, `/security-review` après le bloc panier et avant livraison. Chaque constat est corrigé, rejeté avec justification ou reporté, et consigné dans [ai-reviews.md](ai-reviews.md).
 
-## Outillage fourni (réellement utilisé)
+## Outillage fourni
 
 | Fichier | Rôle |
 |---|---|
 | [AGENTS.md](../AGENTS.md), et [CLAUDE.md](../CLAUDE.md) qui y renvoie | Workflow SDD, boucle de revue, conventions, **invariants de concurrence**, **pièges connus**, interdits |
-| [/spec-task](../.claude/commands/spec-task.md) | Implémenter une tâche de bout en bout : exigences et scénarios, code, tests tracés, matrice |
+| [/spec-task](../.claude/commands/spec-task.md) | **Seule définition** du déroulé d'une tâche : exigences et scénarios, code, tests tracés, matrice |
 | [/spec-check](../.claude/commands/spec-check.md) | Expliquer le résultat de `TraceabilityTests`, qui fait foi |
 | [specs/](../specs/) | Contexte permanent de l'agent : constitution, exigences, designs, tâches |
+
+**Décalage relevé à la relecture finale** : `/spec-task` devait servir à chaque tâche, mais elle n'a jamais été invoquée. L'agent a suivi le même déroulé, recopié dans `AGENTS.md`. Le résultat est le même tant que les deux textes restent identiques, mais rien n'empêchait qu'ils divergent. Correction pour les évolutions suivantes : le déroulé n'est plus défini que dans `spec-task.md`, vers lequel `AGENTS.md` et les `tasks.md` renvoient. L'agent (`/spec-task <id>`) et le candidat suivent ainsi le même fichier. Son étape de clôture précise désormais de reporter **tous** les scénarios et tests dans la matrice, puis de lancer `/spec-check`.
 
 ## Vérifications
 
@@ -26,7 +28,7 @@
 
 ## Propositions de l'IA validées, adaptées ou rejetées
 
-Sélection ; le journal complet (15 entrées) est dans [ai-journal.md](ai-journal.md), dont il garde la numérotation.
+Sélection ; le journal complet (18 entrées) est dans [ai-journal.md](ai-journal.md), dont il garde la numérotation.
 
 | # | Proposition de l'IA | Décision | Résultat |
 |---|---|---|---|
